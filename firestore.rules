@@ -25,6 +25,7 @@ service cloud.firestore {
     // Fields:
     //   - name: string (required, max 100 chars) - The name of the template.
     //   - data: string (required) - Base64 encoded template data.
+    //   - uid: string (optional) - The uid of the user who uploaded the template
     //   - updatedAt: timestamp (required) - Last update time.
     //
     // ===============================================================
@@ -90,9 +91,10 @@ service cloud.firestore {
     }
 
     function isValidTemplate(data) {
-      return hasOnlyAllowedFields(['name', 'data', 'updatedAt']) &&
+      return hasOnlyAllowedFields(['name', 'data', 'updatedAt', 'uid']) &&
              validStringLength('name', 1, 100) &&
              data.data is string &&
+             (!('uid' in data) || validStringLength('uid', 1, 128)) &&
              data.updatedAt is timestamp;
     }
 
@@ -120,8 +122,9 @@ service cloud.firestore {
 
     match /templates/{templateId} {
       allow read: if isAuthenticated();
-      allow create, update: if isAuthenticated() && isValidTemplate(request.resource.data);
-      allow delete: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidTemplate(request.resource.data);
+      allow update: if isAuthenticated() && isValidTemplate(request.resource.data) && (!('uid' in resource.data) || resource.data.uid == request.auth.uid);
+      allow delete: if isAuthenticated() && (!('uid' in resource.data) || resource.data.uid == request.auth.uid);
     }
 
     match /settings/{settingId} {

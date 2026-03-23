@@ -25,7 +25,7 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-export function CertificateForm({ user }: { user: any }) {
+export function CertificateForm({ user, initialData, onClearEdit }: { user: any, initialData?: any, onClearEdit?: () => void }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [submitFormat, setSubmitFormat] = useState<'pdf' | 'docx' | null>(null);
   const [templateBase64, setTemplateBase64] = useState<string | null>(null);
@@ -62,6 +62,21 @@ export function CertificateForm({ user }: { user: any }) {
       certificateDate: format(new Date(), 'yyyy-MM-dd'),
     }
   });
+
+  useEffect(() => {
+    if (initialData) {
+      reset({
+        doctorName: initialData.doctorName || user?.displayName || '',
+        patientFirstName: initialData.patientFirstName || '',
+        patientLastName: initialData.patientLastName || '',
+        patientDob: initialData.patientDob || '',
+        eds: initialData.eds || '',
+        startDate: initialData.startDate || '',
+        endDate: initialData.endDate || '',
+        certificateDate: initialData.certificateDate || format(new Date(), 'yyyy-MM-dd'),
+      });
+    }
+  }, [initialData, reset, user]);
 
   const generateDocument = async (data: FormData, formatType: 'pdf' | 'docx') => {
     const dateJour = format(new Date(data.certificateDate), 'dd.MM.yyyy');
@@ -143,6 +158,7 @@ export function CertificateForm({ user }: { user: any }) {
       
       toast.success('Certificat généré et sauvegardé avec succès');
       reset({ ...data, patientFirstName: '', patientLastName: '', patientDob: '', eds: '', startDate: '', endDate: '', certificateDate: format(new Date(), 'yyyy-MM-dd') });
+      if (onClearEdit) onClearEdit();
     } catch (error) {
       console.error('Error generating certificate:', error);
       toast.error('Erreur lors de la génération du certificat');
@@ -154,9 +170,35 @@ export function CertificateForm({ user }: { user: any }) {
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="mb-8">
-        <h2 className="text-3xl font-semibold text-gray-900 tracking-tight">Nouveau Certificat</h2>
-        <p className="text-gray-500 mt-2">Générez un certificat d'absence scolaire au format PDF ou Word.</p>
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-semibold text-gray-900 tracking-tight">
+            {initialData ? 'Modifier le Certificat' : 'Nouveau Certificat'}
+          </h2>
+          <p className="text-gray-500 mt-2">
+            {initialData ? 'Modifiez les informations avant de générer à nouveau le certificat.' : 'Générez un certificat d\'absence scolaire au format PDF ou Word.'}
+          </p>
+        </div>
+        {initialData && (
+          <button
+            onClick={() => {
+              if (onClearEdit) onClearEdit();
+              reset({
+                doctorName: user?.displayName || '',
+                patientFirstName: '',
+                patientLastName: '',
+                patientDob: '',
+                eds: '',
+                startDate: '',
+                endDate: '',
+                certificateDate: format(new Date(), 'yyyy-MM-dd'),
+              });
+            }}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+          >
+            Annuler
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/40 border border-gray-100 p-5 sm:p-8 max-w-2xl">
