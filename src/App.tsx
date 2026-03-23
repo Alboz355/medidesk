@@ -4,9 +4,6 @@ import { auth, googleProvider } from './firebase';
 import { Sidebar } from './components/Sidebar';
 import { CertificateForm } from './pages/CertificateForm';
 import { History } from './pages/History';
-import { MedicalSearch } from './pages/MedicalSearch';
-import { ImageGeneration } from './pages/ImageGeneration';
-import { ImageAnalysis } from './pages/ImageAnalysis';
 import { Settings } from './pages/Settings';
 import { Toaster } from 'sonner';
 
@@ -99,9 +96,6 @@ export default function App() {
         <div className="max-w-5xl mx-auto p-8">
           {activeTab === 'certificate' && <CertificateForm user={user} />}
           {activeTab === 'history' && <History user={user} />}
-          {activeTab === 'search' && <MedicalSearch />}
-          {activeTab === 'image-gen' && <ImageGeneration />}
-          {activeTab === 'image-scan' && <ImageAnalysis />}
           {activeTab === 'settings' && <Settings />}
         </div>
       </main>

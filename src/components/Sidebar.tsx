@@ -14,9 +14,6 @@ export function Sidebar({ activeTab, setActiveTab, onLogout, userPhoto, userName
   const navItems = [
     { id: 'certificate', label: 'Certificats', icon: FileText },
     { id: 'history', label: 'Historique', icon: Clock },
-    { id: 'search', label: 'Recherche Médicale', icon: Search },
-    { id: 'image-gen', label: 'Générer Image', icon: ImageIcon },
-    { id: 'image-scan', label: 'Analyser Image', icon: ScanText },
     { id: 'settings', label: 'Paramètres', icon: SettingsIcon },
   ];
 
