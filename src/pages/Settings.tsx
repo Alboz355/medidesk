@@ -34,23 +34,43 @@ export function Settings() {
       return;
     }
 
+    // Vérification de la taille (Firestore limite à 1Mo par document)
+    // 700 Ko est une limite sûre car le Base64 augmente la taille d'environ 33%
+    if (file.size > 700 * 1024) {
+      toast.error("Le fichier est trop lourd (max 700 Ko). Veuillez réduire la taille du logo ou des images dans le document Word.");
+      return;
+    }
+
     setUploading(true);
     const reader = new FileReader();
     reader.onload = async (event) => {
       try {
         const base64 = (event.target?.result as string).split(',')[1];
         
-        await setDoc(doc(db, 'templates', 'default'), {
+        // On crée une promesse qui rejette après 10 secondes pour éviter le chargement infini
+        const uploadPromise = setDoc(doc(db, 'templates', 'default'), {
           name: file.name,
           data: base64,
           updatedAt: serverTimestamp()
         });
 
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("TIMEOUT")), 10000)
+        );
+
+        await Promise.race([uploadPromise, timeoutPromise]);
+
         setTemplateName(file.name);
         toast.success('Modèle Word enregistré pour tous les utilisateurs !');
-      } catch (error) {
+      } catch (error: any) {
         console.error("Erreur lors de la sauvegarde du modèle:", error);
-        toast.error('Erreur lors de la sauvegarde du modèle');
+        if (error.message === "TIMEOUT" || error.code === 'unavailable') {
+          toast.error("Connexion impossible. Vérifiez que la base Firestore est bien créée dans la console Firebase.");
+        } else if (error.code === 'permission-denied') {
+          toast.error("Permission refusée. Vérifiez les règles de sécurité Firestore.");
+        } else {
+          toast.error('Erreur lors de la sauvegarde du modèle');
+        }
       } finally {
         setUploading(false);
       }

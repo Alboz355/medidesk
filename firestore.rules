@@ -113,7 +113,8 @@ service cloud.firestore {
 
     match /templates/{templateId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && isValidTemplate(request.resource.data);
+      allow create, update: if isAuthenticated() && isValidTemplate(request.resource.data);
+      allow delete: if isAuthenticated();
     }
   }
 }
