@@ -7,11 +7,11 @@ import Docxtemplater from 'docxtemplater';
 import { saveAs } from 'file-saver';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { FileText, Download, Calendar, User, Loader2 } from 'lucide-react';
+import { FileText, Download, Calendar, User, Loader2, Edit2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateAndDownloadPDF, generateAndDownloadDOCX } from '../lib/pdfGenerator';
 
-export function History({ user }: { user: any }) {
+export function History({ user, onEditCertificate }: { user: any, onEditCertificate: (cert: any) => void }) {
   const [certificates, setCertificates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [templateBase64, setTemplateBase64] = useState<string | null>(null);
@@ -177,6 +177,14 @@ export function History({ user }: { user: any }) {
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto mt-3 sm:mt-0">
+                <button
+                  onClick={() => onEditCertificate(cert)}
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-white border border-gray-200 hover:border-gray-900 text-gray-700 hover:text-gray-900 rounded-lg font-medium transition-colors duration-200 text-sm"
+                  title="Modifier"
+                >
+                  <Edit2 className="w-4 h-4" />
+                  <span className="sm:hidden">Modifier</span>
+                </button>
                 <button
                   onClick={() => generateDocument(cert, 'docx')}
                   disabled={generatingId === cert.id}

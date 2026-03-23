@@ -4,8 +4,9 @@ import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firest
 import { db } from '../firebase';
 import { toast } from 'sonner';
 
-export function Settings() {
+export function Settings({ user }: { user: any }) {
   const [templateName, setTemplateName] = useState<string | null>(null);
+  const [templateUid, setTemplateUid] = useState<string | null>(null);
   const [convertApiKey, setConvertApiKey] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -17,6 +18,7 @@ export function Settings() {
         const docSnap = await getDoc(doc(db, 'templates', 'default'));
         if (docSnap.exists()) {
           setTemplateName(docSnap.data().name);
+          setTemplateUid(docSnap.data().uid);
         }
         
         const apiSnap = await getDoc(doc(db, 'settings', 'api'));
@@ -74,6 +76,7 @@ export function Settings() {
         const uploadPromise = setDoc(doc(db, 'templates', 'default'), {
           name: file.name,
           data: base64,
+          uid: user.uid,
           updatedAt: serverTimestamp()
         });
 
@@ -84,6 +87,7 @@ export function Settings() {
         await Promise.race([uploadPromise, timeoutPromise]);
 
         setTemplateName(file.name);
+        setTemplateUid(user.uid);
         toast.success('Modèle Word enregistré pour tous les utilisateurs !');
       } catch (error: any) {
         console.error("Erreur lors de la sauvegarde du modèle:", error);
@@ -105,6 +109,7 @@ export function Settings() {
     try {
       await deleteDoc(doc(db, 'templates', 'default'));
       setTemplateName(null);
+      setTemplateUid(null);
       toast.success('Modèle supprimé. Le générateur PDF par défaut sera utilisé.');
     } catch (error) {
       console.error("Erreur lors de la suppression:", error);
@@ -151,13 +156,15 @@ export function Settings() {
                   <p className="text-xs text-gray-500">{templateName}</p>
                 </div>
               </div>
-              <button
-                onClick={removeTemplate}
-                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                title="Supprimer le modèle"
-              >
-                <Trash2 className="w-5 h-5" />
-              </button>
+              {(!templateUid || templateUid === user?.uid) && (
+                <button
+                  onClick={removeTemplate}
+                  className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Supprimer le modèle"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+              )}
             </div>
           ) : (
             <label className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg bg-white hover:bg-gray-50 transition-colors ${uploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
@@ -177,42 +184,44 @@ export function Settings() {
           )}
         </div>
       </div>
-      <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/40 border border-gray-100 p-5 sm:p-8 max-w-2xl mt-8">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Conversion PDF Parfaite (Optionnel)</h3>
-        
-        <div className="bg-gray-50 rounded-xl p-4 sm:p-6 border border-gray-200">
-          <p className="text-sm text-gray-600 mb-4">
-            Pour que le PDF généré soit <strong>exactement identique</strong> à votre modèle Word (en gardant les colonnes, logos, et mises en page complexes), vous pouvez utiliser le service gratuit ConvertAPI.
-          </p>
-          <ol className="list-decimal list-inside text-sm text-gray-600 mb-6 space-y-1">
-            <li>Créez un compte gratuit sur <a href="https://www.convertapi.com/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">ConvertAPI</a></li>
-            <li>Allez dans votre tableau de bord et copiez votre <strong>Secret Key</strong></li>
-            <li>Collez-la ci-dessous</li>
-          </ol>
+      {(!templateUid || templateUid === user?.uid) && (
+        <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/40 border border-gray-100 p-5 sm:p-8 max-w-2xl mt-8">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Conversion PDF Parfaite (Optionnel)</h3>
 
-          <div className="flex gap-3">
-            <div className="relative flex-1">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Key className="h-5 w-5 text-gray-400" />
+          <div className="bg-gray-50 rounded-xl p-4 sm:p-6 border border-gray-200">
+            <p className="text-sm text-gray-600 mb-4">
+              Pour que le PDF généré soit <strong>exactement identique</strong> à votre modèle Word (en gardant les colonnes, logos, et mises en page complexes), vous pouvez utiliser le service gratuit ConvertAPI.
+            </p>
+            <ol className="list-decimal list-inside text-sm text-gray-600 mb-6 space-y-1">
+              <li>Créez un compte gratuit sur <a href="https://www.convertapi.com/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">ConvertAPI</a></li>
+              <li>Allez dans votre tableau de bord et copiez votre <strong>Secret Key</strong></li>
+              <li>Collez-la ci-dessous</li>
+            </ol>
+
+            <div className="flex gap-3">
+              <div className="relative flex-1">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Key className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  type="password"
+                  value={convertApiKey}
+                  onChange={(e) => setConvertApiKey(e.target.value)}
+                  placeholder="Votre Secret Key ConvertAPI"
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-gray-900 focus:border-gray-900 sm:text-sm"
+                />
               </div>
-              <input
-                type="password"
-                value={convertApiKey}
-                onChange={(e) => setConvertApiKey(e.target.value)}
-                placeholder="Votre Secret Key ConvertAPI"
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-gray-900 focus:border-gray-900 sm:text-sm"
-              />
+              <button
+                onClick={saveApiKey}
+                disabled={savingKey}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 disabled:opacity-50"
+              >
+                {savingKey ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Enregistrer'}
+              </button>
             </div>
-            <button
-              onClick={saveApiKey}
-              disabled={savingKey}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 disabled:opacity-50"
-            >
-              {savingKey ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Enregistrer'}
-            </button>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
