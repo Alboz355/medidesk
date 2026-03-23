@@ -3,16 +3,14 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { jsPDF } from 'jspdf';
-import PizZip from 'pizzip';
-import Docxtemplater from 'docxtemplater';
-import { saveAs } from 'file-saver';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { collection, addDoc, serverTimestamp, getDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { toast } from 'sonner';
-import { FileText, Loader2 } from 'lucide-react';
+import { FileText, Loader2, Download } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { generateAndDownloadPDF, generateAndDownloadDOCX } from '../lib/pdfGenerator';
 
 const schema = z.object({
   doctorName: z.string().min(1, 'Le nom du médecin est requis').max(100),
@@ -22,26 +20,34 @@ const schema = z.object({
   eds: z.string().min(1, 'Le N° EDS est requis').max(50),
   startDate: z.string().min(1, 'La date de début est requise'),
   endDate: z.string().min(1, 'La date de fin est requise'),
+  certificateDate: z.string().min(1, 'La date du certificat est requise'),
 });
 
 type FormData = z.infer<typeof schema>;
 
 export function CertificateForm({ user }: { user: any }) {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [submitFormat, setSubmitFormat] = useState<'pdf' | 'docx' | null>(null);
   const [templateBase64, setTemplateBase64] = useState<string | null>(null);
+  const [convertApiKey, setConvertApiKey] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchTemplate = async () => {
+    const fetchSettings = async () => {
       try {
         const docSnap = await getDoc(doc(db, 'templates', 'default'));
         if (docSnap.exists()) {
           setTemplateBase64(docSnap.data().data);
         }
+        
+        const apiSnap = await getDoc(doc(db, 'settings', 'api'));
+        if (apiSnap.exists() && apiSnap.data().convertApiKey) {
+          setConvertApiKey(apiSnap.data().convertApiKey);
+        }
       } catch (error) {
-        console.error("Erreur lors de la récupération du modèle:", error);
+        console.error("Erreur lors de la récupération des paramètres:", error);
       }
     };
-    fetchTemplate();
+    fetchSettings();
   }, []);
 
   const {
@@ -53,50 +59,40 @@ export function CertificateForm({ user }: { user: any }) {
     resolver: zodResolver(schema),
     defaultValues: {
       doctorName: user?.displayName || '',
+      certificateDate: format(new Date(), 'yyyy-MM-dd'),
     }
   });
 
-  const generateDocument = (data: FormData) => {
-    const dateJour = format(new Date(), 'dd.MM.yy');
-    const ddn = format(new Date(data.patientDob), 'dd.MM.yy');
-    const duree1 = format(new Date(data.startDate), 'dd.MM.yy');
-    const duree2 = format(new Date(data.endDate), 'dd.MM.yy');
+  const generateDocument = async (data: FormData, formatType: 'pdf' | 'docx') => {
+    const dateJour = format(new Date(data.certificateDate), 'dd.MM.yyyy');
+    const ddn = format(new Date(data.patientDob), 'dd.MM.yyyy');
+    const duree1 = format(new Date(data.startDate), 'dd.MM.yyyy');
+    const duree2 = format(new Date(data.endDate), 'dd.MM.yyyy');
 
     if (templateBase64) {
       try {
-        const binaryString = window.atob(templateBase64);
-        const len = binaryString.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-        }
-        
-        const zip = new PizZip(bytes.buffer);
-        const doc = new Docxtemplater(zip, {
-            paragraphLoop: true,
-            linebreaks: true,
-        });
-
-        doc.render({
+        const templateData = {
             PRENOM: data.patientFirstName,
             NOM: data.patientLastName,
             DDN: ddn,
             EDS: data.eds,
             DATE_JOUR: dateJour,
+            DATE_DU_JOUR: dateJour,
             DUREE1: duree1,
             DUREE2: duree2,
             DOCTEUR: data.doctorName
-        });
+        };
 
-        const out = doc.getZip().generate({
-            type: 'blob',
-            mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        });
-        saveAs(out, `Certificat_${data.patientLastName}_${format(new Date(), 'yyyyMMdd')}.docx`);
+        const fileName = `Certificat_${data.patientLastName}_${format(new Date(), 'yyyyMMdd')}.${formatType}`;
+        if (formatType === 'pdf') {
+          await generateAndDownloadPDF(templateBase64, templateData, fileName, convertApiKey);
+        } else {
+          await generateAndDownloadDOCX(templateBase64, templateData, fileName);
+        }
         return;
       } catch (error) {
-        console.error("Erreur avec le modèle Word:", error);
-        toast.error("Erreur avec le modèle Word. Génération du PDF par défaut.");
+        console.error(`Erreur avec le modèle ${formatType}:`, error);
+        toast.error(`Erreur lors de la génération du ${formatType.toUpperCase()}.`);
       }
     }
 
@@ -124,8 +120,9 @@ export function CertificateForm({ user }: { user: any }) {
     doc.save(`Certificat_${data.patientLastName}_${format(new Date(), 'yyyyMMdd')}.pdf`);
   };
 
-  const onSubmit = async (data: FormData) => {
+  const onSubmit = async (data: FormData, formatType: 'pdf' | 'docx') => {
     setIsGenerating(true);
+    setSubmitFormat(formatType);
     try {
       // Save to Firestore
       await addDoc(collection(db, 'certificates'), {
@@ -137,19 +134,21 @@ export function CertificateForm({ user }: { user: any }) {
         eds: data.eds,
         startDate: data.startDate,
         endDate: data.endDate,
+        certificateDate: data.certificateDate,
         createdAt: serverTimestamp(),
       });
 
       // Generate Document
-      generateDocument(data);
+      await generateDocument(data, formatType);
       
       toast.success('Certificat généré et sauvegardé avec succès');
-      reset({ ...data, patientFirstName: '', patientLastName: '', patientDob: '', eds: '', startDate: '', endDate: '' });
+      reset({ ...data, patientFirstName: '', patientLastName: '', patientDob: '', eds: '', startDate: '', endDate: '', certificateDate: format(new Date(), 'yyyy-MM-dd') });
     } catch (error) {
       console.error('Error generating certificate:', error);
       toast.error('Erreur lors de la génération du certificat');
     } finally {
       setIsGenerating(false);
+      setSubmitFormat(null);
     }
   };
 
@@ -160,25 +159,40 @@ export function CertificateForm({ user }: { user: any }) {
         <p className="text-gray-500 mt-2">Générez un certificat d'absence scolaire au format PDF ou Word.</p>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/40 border border-gray-100 p-8 max-w-2xl">
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/40 border border-gray-100 p-5 sm:p-8 max-w-2xl">
+        <form className="space-y-6">
           
           <div className="pb-6 border-b border-gray-100">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Médecin signataire</label>
-              <input
-                {...register('doctorName')}
-                className={cn(
-                  "w-full px-4 py-3 rounded-xl border bg-gray-50/50 focus:bg-white transition-all duration-200 outline-none focus:ring-2 focus:ring-gray-900/10",
-                  errors.doctorName ? "border-red-300 focus:border-red-500" : "border-gray-200 focus:border-gray-900"
-                )}
-                placeholder="Dr. Dupont"
-              />
-              {errors.doctorName && <p className="text-xs text-red-500">{errors.doctorName.message}</p>}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Médecin signataire</label>
+                <input
+                  {...register('doctorName')}
+                  className={cn(
+                    "w-full px-4 py-3 rounded-xl border bg-gray-50/50 focus:bg-white transition-all duration-200 outline-none focus:ring-2 focus:ring-gray-900/10",
+                    errors.doctorName ? "border-red-300 focus:border-red-500" : "border-gray-200 focus:border-gray-900"
+                  )}
+                  placeholder="Dr. Dupont"
+                />
+                {errors.doctorName && <p className="text-xs text-red-500">{errors.doctorName.message}</p>}
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Date du certificat</label>
+                <input
+                  type="date"
+                  {...register('certificateDate')}
+                  className={cn(
+                    "w-full px-4 py-3 rounded-xl border bg-gray-50/50 focus:bg-white transition-all duration-200 outline-none focus:ring-2 focus:ring-gray-900/10",
+                    errors.certificateDate ? "border-red-300 focus:border-red-500" : "border-gray-200 focus:border-gray-900"
+                  )}
+                />
+                {errors.certificateDate && <p className="text-xs text-red-500">{errors.certificateDate.message}</p>}
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">Prénom du patient</label>
               <input
@@ -206,7 +220,7 @@ export function CertificateForm({ user }: { user: any }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">Date de naissance</label>
               <input
@@ -234,7 +248,7 @@ export function CertificateForm({ user }: { user: any }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">Date de début d'absence</label>
               <input
@@ -262,23 +276,34 @@ export function CertificateForm({ user }: { user: any }) {
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={isSubmitting || isGenerating}
-            className="w-full bg-gray-900 text-white py-3.5 px-4 rounded-xl font-medium hover:bg-gray-800 hover:shadow-lg hover:shadow-gray-900/20 transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
-          >
-            {isGenerating ? (
-              <>
+          <div className="flex flex-col sm:flex-row gap-3 pt-4">
+            <button
+              type="button"
+              onClick={handleSubmit((data) => onSubmit(data, 'docx'))}
+              disabled={isGenerating}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 bg-white border-2 border-gray-200 text-gray-700 hover:border-gray-900 hover:text-gray-900 rounded-xl font-medium transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {isGenerating && submitFormat === 'docx' ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Génération en cours...
-              </>
-            ) : (
-              <>
+              ) : (
                 <FileText className="w-5 h-5" />
-                Générer le Certificat
-              </>
-            )}
-          </button>
+              )}
+              Télécharger Word
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit((data) => onSubmit(data, 'pdf'))}
+              disabled={isGenerating}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 bg-gray-900 text-white hover:bg-gray-800 rounded-xl font-medium transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed shadow-lg shadow-gray-900/20"
+            >
+              {isGenerating && submitFormat === 'pdf' ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Download className="w-5 h-5" />
+              )}
+              Télécharger PDF
+            </button>
+          </div>
         </form>
       </div>
     </div>

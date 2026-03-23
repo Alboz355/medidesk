@@ -1,29 +1,52 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, FileText, Trash2, CheckCircle2, Loader2 } from 'lucide-react';
+import { Upload, FileText, Trash2, CheckCircle2, Loader2, Key } from 'lucide-react';
 import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { toast } from 'sonner';
 
 export function Settings() {
   const [templateName, setTemplateName] = useState<string | null>(null);
+  const [convertApiKey, setConvertApiKey] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [savingKey, setSavingKey] = useState(false);
 
   useEffect(() => {
-    const fetchTemplate = async () => {
+    const fetchSettings = async () => {
       try {
         const docSnap = await getDoc(doc(db, 'templates', 'default'));
         if (docSnap.exists()) {
           setTemplateName(docSnap.data().name);
         }
+        
+        const apiSnap = await getDoc(doc(db, 'settings', 'api'));
+        if (apiSnap.exists() && apiSnap.data().convertApiKey) {
+          setConvertApiKey(apiSnap.data().convertApiKey);
+        }
       } catch (error) {
-        console.error("Erreur lors de la récupération du modèle:", error);
+        console.error("Erreur lors de la récupération des paramètres:", error);
       } finally {
         setLoading(false);
       }
     };
-    fetchTemplate();
+    fetchSettings();
   }, []);
+
+  const saveApiKey = async () => {
+    setSavingKey(true);
+    try {
+      await setDoc(doc(db, 'settings', 'api'), {
+        convertApiKey: convertApiKey,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+      toast.success('Clé API sauvegardée avec succès');
+    } catch (error) {
+      console.error("Erreur lors de la sauvegarde de la clé:", error);
+      toast.error('Erreur lors de la sauvegarde de la clé API');
+    } finally {
+      setSavingKey(false);
+    }
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -96,10 +119,10 @@ export function Settings() {
         <p className="text-gray-500 mt-2">Configurez le modèle de certificat Word global pour le cabinet.</p>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/40 border border-gray-100 p-8 max-w-2xl">
+      <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/40 border border-gray-100 p-5 sm:p-8 max-w-2xl">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Modèle de Certificat (.docx)</h3>
         
-        <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
+        <div className="bg-gray-50 rounded-xl p-4 sm:p-6 border border-gray-200">
           <p className="text-sm text-gray-600 mb-4">
             Uploadez le fichier Word de base du cabinet. Ce modèle sera utilisé par <strong>tous les utilisateurs</strong>.<br/>
             Il doit contenir les balises suivantes :<br/>
@@ -107,7 +130,7 @@ export function Settings() {
             <code className="bg-gray-200 px-1 py-0.5 rounded text-gray-800 font-mono text-xs ml-1">{'{NOM}'}</code>, 
             <code className="bg-gray-200 px-1 py-0.5 rounded text-gray-800 font-mono text-xs ml-1">{'{DDN}'}</code>, 
             <code className="bg-gray-200 px-1 py-0.5 rounded text-gray-800 font-mono text-xs ml-1">{'{EDS}'}</code>, 
-            <code className="bg-gray-200 px-1 py-0.5 rounded text-gray-800 font-mono text-xs ml-1">{'{DATE_JOUR}'}</code>, 
+            <code className="bg-gray-200 px-1 py-0.5 rounded text-gray-800 font-mono text-xs ml-1">{'{DATE_JOUR}'}</code> ou <code className="bg-gray-200 px-1 py-0.5 rounded text-gray-800 font-mono text-xs">{'{DATE_DU_JOUR}'}</code>, 
             <code className="bg-gray-200 px-1 py-0.5 rounded text-gray-800 font-mono text-xs ml-1">{'{DUREE1}'}</code>, 
             <code className="bg-gray-200 px-1 py-0.5 rounded text-gray-800 font-mono text-xs ml-1">{'{DUREE2}'}</code>, 
             <code className="bg-gray-200 px-1 py-0.5 rounded text-gray-800 font-mono text-xs ml-1">{'{DOCTEUR}'}</code>
@@ -152,6 +175,42 @@ export function Settings() {
               <input type="file" className="hidden" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleFileUpload} disabled={uploading} />
             </label>
           )}
+        </div>
+      </div>
+      <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/40 border border-gray-100 p-5 sm:p-8 max-w-2xl mt-8">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Conversion PDF Parfaite (Optionnel)</h3>
+        
+        <div className="bg-gray-50 rounded-xl p-4 sm:p-6 border border-gray-200">
+          <p className="text-sm text-gray-600 mb-4">
+            Pour que le PDF généré soit <strong>exactement identique</strong> à votre modèle Word (en gardant les colonnes, logos, et mises en page complexes), vous pouvez utiliser le service gratuit ConvertAPI.
+          </p>
+          <ol className="list-decimal list-inside text-sm text-gray-600 mb-6 space-y-1">
+            <li>Créez un compte gratuit sur <a href="https://www.convertapi.com/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">ConvertAPI</a></li>
+            <li>Allez dans votre tableau de bord et copiez votre <strong>Secret Key</strong></li>
+            <li>Collez-la ci-dessous</li>
+          </ol>
+
+          <div className="flex gap-3">
+            <div className="relative flex-1">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Key className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                type="password"
+                value={convertApiKey}
+                onChange={(e) => setConvertApiKey(e.target.value)}
+                placeholder="Votre Secret Key ConvertAPI"
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-gray-900 focus:border-gray-900 sm:text-sm"
+              />
+            </div>
+            <button
+              onClick={saveApiKey}
+              disabled={savingKey}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 disabled:opacity-50"
+            >
+              {savingKey ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Enregistrer'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

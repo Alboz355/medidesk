@@ -76,7 +76,7 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidCertificate(data) {
-      return hasOnlyAllowedFields(['uid', 'doctorName', 'patientFirstName', 'patientLastName', 'patientDob', 'eds', 'startDate', 'endDate', 'createdAt']) &&
+      return hasOnlyAllowedFields(['uid', 'doctorName', 'patientFirstName', 'patientLastName', 'patientDob', 'eds', 'startDate', 'endDate', 'createdAt', 'certificateDate']) &&
              validStringLength('uid', 1, 128) &&
              validStringLength('doctorName', 1, 100) &&
              validStringLength('patientFirstName', 1, 100) &&
@@ -85,6 +85,7 @@ service cloud.firestore {
              validStringLength('eds', 1, 50) &&
              validStringLength('startDate', 1, 20) &&
              validStringLength('endDate', 1, 20) &&
+             (!('certificateDate' in data) || validStringLength('certificateDate', 1, 20)) &&
              data.createdAt is timestamp;
     }
 
@@ -92,6 +93,12 @@ service cloud.firestore {
       return hasOnlyAllowedFields(['name', 'data', 'updatedAt']) &&
              validStringLength('name', 1, 100) &&
              data.data is string &&
+             data.updatedAt is timestamp;
+    }
+
+    function isValidSetting(data) {
+      return hasOnlyAllowedFields(['convertApiKey', 'updatedAt']) &&
+             (data.convertApiKey is string || data.convertApiKey == null) &&
              data.updatedAt is timestamp;
     }
 
@@ -114,6 +121,12 @@ service cloud.firestore {
     match /templates/{templateId} {
       allow read: if isAuthenticated();
       allow create, update: if isAuthenticated() && isValidTemplate(request.resource.data);
+      allow delete: if isAuthenticated();
+    }
+
+    match /settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && isValidSetting(request.resource.data);
       allow delete: if isAuthenticated();
     }
   }
