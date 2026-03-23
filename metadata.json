@@ -1,0 +1,5 @@
+{
+  "name": "MediDesk Pro",
+  "description": "Application web haut de gamme pour cabinet médical. Génération de certificats PDF, historique, recherche médicale via IA, génération et analyse d'images médicales.",
+  "requestFramePermissions": []
+}

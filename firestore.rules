@@ -1,0 +1,119 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: certificates
+    // Document ID: auto-generated
+    // Fields:
+    //   - uid: string (required) - The user ID of the doctor who generated the certificate.
+    //   - doctorName: string (required, max 100 chars) - The name of the doctor.
+    //   - patientFirstName: string (required, max 100 chars) - The first name of the patient.
+    //   - patientLastName: string (required, max 100 chars) - The last name of the patient.
+    //   - patientDob: string (required, max 20 chars) - The date of birth of the patient.
+    //   - eds: string (required, max 50 chars) - The EDS number.
+    //   - startDate: string (required, max 20 chars) - The start date.
+    //   - endDate: string (required, max 20 chars) - The end date.
+    //   - createdAt: timestamp (required, immutable) - The timestamp when the certificate was created.
+    //
+    // Collection: templates
+    // Document ID: auto-generated or specific (e.g., 'default')
+    // Fields:
+    //   - name: string (required, max 100 chars) - The name of the template.
+    //   - data: string (required) - Base64 encoded template data.
+    //   - updatedAt: timestamp (required) - Last update time.
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.uid;
+    }
+    
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid;
+    }
+    
+    function uidNotModified() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == resource.data.uid;
+    }
+    
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+    
+    function validStringLength(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+        request.resource.data[field].size() >= minLen &&
+        request.resource.data[field].size() <= maxLen;
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidCertificate(data) {
+      return hasOnlyAllowedFields(['uid', 'doctorName', 'patientFirstName', 'patientLastName', 'patientDob', 'eds', 'startDate', 'endDate', 'createdAt']) &&
+             validStringLength('uid', 1, 128) &&
+             validStringLength('doctorName', 1, 100) &&
+             validStringLength('patientFirstName', 1, 100) &&
+             validStringLength('patientLastName', 1, 100) &&
+             validStringLength('patientDob', 1, 20) &&
+             validStringLength('eds', 1, 50) &&
+             validStringLength('startDate', 1, 20) &&
+             validStringLength('endDate', 1, 20) &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidTemplate(data) {
+      return hasOnlyAllowedFields(['name', 'data', 'updatedAt']) &&
+             validStringLength('name', 1, 100) &&
+             data.data is string &&
+             data.updatedAt is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /certificates/{certificateId} {
+      allow read: if isDocOwner();
+      allow create: if isAuthenticated() && 
+                       isValidCertificate(request.resource.data) && 
+                       uidUnchanged();
+      allow update: if isDocOwner() && 
+                       isValidCertificate(request.resource.data) && 
+                       uidNotModified() &&
+                       areImmutableFieldsUnchanged(['createdAt']);
+      allow delete: if isDocOwner();
+    }
+
+    match /templates/{templateId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isValidTemplate(request.resource.data);
+    }
+  }
+}
