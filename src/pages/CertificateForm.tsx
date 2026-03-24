@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { FileText, Loader2, Download, Pencil, User } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { generateAndDownloadPDF, generateAndDownloadDOCX } from '../lib/pdfGenerator';
+import { PasswordPrompt } from '../components/PasswordPrompt';
 
 const schema = z.object({
   doctorName: z.string().min(1, 'Le nom du médecin est requis').max(100),
@@ -34,6 +35,8 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
   const [templateBase64, setTemplateBase64] = useState<string | null>(null);
   const [convertApiKey, setConvertApiKey] = useState<string | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [pendingData, setPendingData] = useState<{data: any, formatType: 'pdf' | 'docx'} | null>(null);
 
   const {
     register,
@@ -175,6 +178,14 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
   };
 
   const onSubmit = async (data: FormData, formatType: 'pdf' | 'docx') => {
+    setPendingData({ data, formatType });
+    setShowPassword(true);
+  };
+
+  const executeGeneration = async () => {
+    if (!pendingData) return;
+    const { data, formatType } = pendingData;
+    
     setIsGenerating(true);
     setSubmitFormat(formatType);
     try {
@@ -207,11 +218,17 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
     } finally {
       setIsGenerating(false);
       setSubmitFormat(null);
+      setPendingData(null);
     }
   };
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <PasswordPrompt 
+        isOpen={showPassword} 
+        onClose={() => setShowPassword(false)} 
+        onSuccess={executeGeneration} 
+      />
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-semibold text-gray-900 tracking-tight">Nouveau Certificat</h2>

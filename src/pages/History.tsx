@@ -7,6 +7,7 @@ import { fr } from 'date-fns/locale';
 import { FileText, Download, Calendar, User, Loader2, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateAndDownloadPDF, generateAndDownloadDOCX } from '../lib/pdfGenerator';
+import { PasswordPrompt } from '../components/PasswordPrompt';
 
 export function History({ user, onEdit }: { user: any, onEdit: (data: any) => void }) {
   const [certificates, setCertificates] = useState<any[]>([]);
@@ -16,6 +17,8 @@ export function History({ user, onEdit }: { user: any, onEdit: (data: any) => vo
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [generatingFormat, setGeneratingFormat] = useState<'pdf' | 'docx' | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [pendingAction, setPendingAction] = useState<{cert: any, format: 'pdf' | 'docx'} | null>(null);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -65,7 +68,15 @@ export function History({ user, onEdit }: { user: any, onEdit: (data: any) => vo
     return () => unsubscribe();
   }, [user]);
 
-  const generateDocument = async (data: any, formatType: 'pdf' | 'docx') => {
+  const handleGenerateClick = (cert: any, formatType: 'pdf' | 'docx') => {
+    setPendingAction({ cert, format: formatType });
+    setShowPassword(true);
+  };
+
+  const executeGeneration = async () => {
+    if (!pendingAction) return;
+    const { cert: data, format: formatType } = pendingAction;
+    
     setGeneratingId(data.id);
     setGeneratingFormat(formatType);
     try {
@@ -135,6 +146,7 @@ export function History({ user, onEdit }: { user: any, onEdit: (data: any) => vo
     } finally {
       setGeneratingId(null);
       setGeneratingFormat(null);
+      setPendingAction(null);
     }
   };
 
@@ -155,6 +167,11 @@ export function History({ user, onEdit }: { user: any, onEdit: (data: any) => vo
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <PasswordPrompt 
+        isOpen={showPassword} 
+        onClose={() => setShowPassword(false)} 
+        onSuccess={executeGeneration} 
+      />
       <div className="mb-8">
         <h2 className="text-3xl font-semibold text-gray-900 tracking-tight">Historique</h2>
         <p className="text-gray-500 mt-2">Tous vos certificats générés.</p>
@@ -206,7 +223,7 @@ export function History({ user, onEdit }: { user: any, onEdit: (data: any) => vo
                   Modifier
                 </button>
                 <button
-                  onClick={() => generateDocument(cert, 'docx')}
+                  onClick={() => handleGenerateClick(cert, 'docx')}
                   disabled={generatingId === cert.id}
                   className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-white border border-gray-200 hover:border-gray-900 text-gray-700 hover:text-gray-900 rounded-lg font-medium transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed text-sm"
                 >
@@ -218,7 +235,7 @@ export function History({ user, onEdit }: { user: any, onEdit: (data: any) => vo
                   Word
                 </button>
                 <button
-                  onClick={() => generateDocument(cert, 'pdf')}
+                  onClick={() => handleGenerateClick(cert, 'pdf')}
                   disabled={generatingId === cert.id}
                   className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-gray-50 hover:bg-gray-900 text-gray-700 hover:text-white rounded-lg font-medium transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed text-sm"
                 >
