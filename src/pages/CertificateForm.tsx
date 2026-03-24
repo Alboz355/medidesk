@@ -8,14 +8,17 @@ import { fr } from 'date-fns/locale';
 import { collection, addDoc, serverTimestamp, getDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { toast } from 'sonner';
-import { FileText, Loader2, Download, Pencil } from 'lucide-react';
+import { FileText, Loader2, Download, Pencil, User } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { generateAndDownloadPDF, generateAndDownloadDOCX } from '../lib/pdfGenerator';
 
 const schema = z.object({
   doctorName: z.string().min(1, 'Le nom du médecin est requis').max(100),
+  doctorTitle: z.enum(['Docteur', 'Docteure']),
+  doctorRole: z.enum(['interne', 'associé']),
   patientFirstName: z.string().min(1, 'Le prénom est requis').max(100),
   patientLastName: z.string().min(1, 'Le nom est requis').max(100),
+  patientGender: z.enum(['né', 'née']),
   patientDob: z.string().min(1, 'La date de naissance est requise'),
   eds: z.string().min(1, 'Le N° EDS est requis').max(50),
   startDate: z.string().min(1, 'La date de début est requise'),
@@ -36,11 +39,15 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       doctorName: user?.displayName || '',
+      doctorTitle: 'Docteur',
+      doctorRole: 'interne',
+      patientGender: 'né',
       certificateDate: format(new Date(), 'yyyy-MM-dd'),
     }
   });
@@ -49,8 +56,11 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
     if (editData) {
       reset({
         doctorName: editData.doctorName || '',
+        doctorTitle: editData.doctorTitle || 'Docteur',
+        doctorRole: editData.doctorRole || 'interne',
         patientFirstName: editData.patientFirstName || '',
         patientLastName: editData.patientLastName || '',
+        patientGender: editData.patientGender || 'né',
         patientDob: editData.patientDob || '',
         eds: editData.eds || '',
         startDate: editData.startDate || '',
@@ -82,6 +92,27 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
     fetchSettings();
   }, []);
 
+  const loadDefaultInfo = async () => {
+    if (!user?.uid) return;
+    try {
+      const userSnap = await getDoc(doc(db, 'users', user.uid));
+      if (userSnap.exists() && userSnap.data().defaultInfo) {
+        const info = userSnap.data().defaultInfo;
+        if (info.firstName) setValue('patientFirstName', info.firstName);
+        if (info.lastName) setValue('patientLastName', info.lastName);
+        if (info.dob) setValue('patientDob', info.dob);
+        if (info.eds) setValue('eds', info.eds);
+        if (info.gender) setValue('patientGender', info.gender);
+        toast.success("Informations personnelles chargées");
+      } else {
+        toast.error("Aucune information personnelle trouvée. Configurez-les dans les paramètres.");
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement des infos:", error);
+      toast.error("Erreur lors du chargement des informations");
+    }
+  };
+
   const generateDocument = async (data: FormData, formatType: 'pdf' | 'docx') => {
     const dateJour = format(new Date(data.certificateDate), 'dd.MM.yyyy');
     const ddn = format(new Date(data.patientDob), 'dd.MM.yyyy');
@@ -99,7 +130,10 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
             DATE_DU_JOUR: dateJour,
             DUREE1: duree1,
             DUREE2: duree2,
-            DOCTEUR: data.doctorName
+            DOCTEUR: data.doctorName,
+            hof: data.doctorTitle,
+            "i/a": data.doctorRole,
+            "né": data.patientGender
         };
 
         const fileName = `Certificat_${data.patientLastName}_${format(new Date(), 'yyyyMMdd')}.${formatType}`;
@@ -122,7 +156,7 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
     doc.setFontSize(12);
 
     // Header info
-    doc.text(`${data.patientFirstName} ${data.patientLastName}, né le ${ddn}`, 20, 40);
+    doc.text(`Concerne : ${data.patientFirstName} ${data.patientLastName}, ${data.patientGender} le ${ddn}`, 20, 40);
     doc.text(`N° EDS : ${data.eds}`, 20, 50);
     
     // Date
@@ -133,7 +167,8 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
     doc.text(`Ne pourra pas fréquenter l'école du ${duree1} au ${duree2}`, 20, 100);
 
     // Footer
-    doc.text(`Docteur ${data.doctorName} Médecin interne`, 120, 140);
+    doc.text(`${data.doctorTitle} ${data.doctorName}`, 120, 140);
+    doc.text(`Médecin ${data.doctorRole}`, 120, 148);
     
     // Save
     doc.save(`Certificat_${data.patientLastName}_${format(new Date(), 'yyyyMMdd')}.pdf`);
@@ -147,8 +182,11 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
       await addDoc(collection(db, 'certificates'), {
         uid: user.uid,
         doctorName: data.doctorName,
+        doctorTitle: data.doctorTitle,
+        doctorRole: data.doctorRole,
         patientFirstName: data.patientFirstName,
         patientLastName: data.patientLastName,
+        patientGender: data.patientGender,
         patientDob: data.patientDob,
         eds: data.eds,
         startDate: data.startDate,
@@ -179,18 +217,59 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
           <h2 className="text-3xl font-semibold text-gray-900 tracking-tight">Nouveau Certificat</h2>
           <p className="text-gray-500 mt-2">Générez un certificat d'absence scolaire au format PDF ou Word.</p>
         </div>
-        {isEditMode && (
-          <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-medium border border-blue-100">
-            <Pencil className="w-4 h-4" />
-            Mode Modification
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={loadDefaultInfo}
+            className="bg-white text-gray-700 px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-medium border border-gray-200 hover:bg-gray-50 transition-colors shadow-sm"
+          >
+            <User className="w-4 h-4" />
+            Utiliser info perso
+          </button>
+          {isEditMode && (
+            <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-medium border border-blue-100">
+              <Pencil className="w-4 h-4" />
+              Mode Modification
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/40 border border-gray-100 p-5 sm:p-8 max-w-2xl">
         <form className="space-y-6">
           
           <div className="pb-6 border-b border-gray-100">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Titre du médecin</label>
+                <select
+                  {...register('doctorTitle')}
+                  className={cn(
+                    "w-full px-4 py-3 rounded-xl border bg-gray-50/50 focus:bg-white transition-all duration-200 outline-none focus:ring-2 focus:ring-gray-900/10",
+                    errors.doctorTitle ? "border-red-300 focus:border-red-500" : "border-gray-200 focus:border-gray-900"
+                  )}
+                >
+                  <option value="Docteur">Docteur (Homme)</option>
+                  <option value="Docteure">Docteure (Femme)</option>
+                </select>
+                {errors.doctorTitle && <p className="text-xs text-red-500">{errors.doctorTitle.message}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Rôle du médecin</label>
+                <select
+                  {...register('doctorRole')}
+                  className={cn(
+                    "w-full px-4 py-3 rounded-xl border bg-gray-50/50 focus:bg-white transition-all duration-200 outline-none focus:ring-2 focus:ring-gray-900/10",
+                    errors.doctorRole ? "border-red-300 focus:border-red-500" : "border-gray-200 focus:border-gray-900"
+                  )}
+                >
+                  <option value="interne">Interne</option>
+                  <option value="associé">Associé(e)</option>
+                </select>
+                {errors.doctorRole && <p className="text-xs text-red-500">{errors.doctorRole.message}</p>}
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">Médecin signataire</label>
@@ -217,6 +296,23 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
                 />
                 {errors.certificateDate && <p className="text-xs text-red-500">{errors.certificateDate.message}</p>}
               </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Genre du patient</label>
+              <select
+                {...register('patientGender')}
+                className={cn(
+                  "w-full px-4 py-3 rounded-xl border bg-gray-50/50 focus:bg-white transition-all duration-200 outline-none focus:ring-2 focus:ring-gray-900/10",
+                  errors.patientGender ? "border-red-300 focus:border-red-500" : "border-gray-200 focus:border-gray-900"
+                )}
+              >
+                <option value="né">Homme (né le)</option>
+                <option value="née">Femme (née le)</option>
+              </select>
+              {errors.patientGender && <p className="text-xs text-red-500">{errors.patientGender.message}</p>}
             </div>
           </div>
 

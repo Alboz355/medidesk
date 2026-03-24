@@ -76,7 +76,7 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidCertificate(data) {
-      return hasOnlyAllowedFields(['uid', 'doctorName', 'patientFirstName', 'patientLastName', 'patientDob', 'eds', 'startDate', 'endDate', 'createdAt', 'certificateDate']) &&
+      return hasOnlyAllowedFields(['uid', 'doctorName', 'patientFirstName', 'patientLastName', 'patientDob', 'eds', 'startDate', 'endDate', 'createdAt', 'certificateDate', 'doctorTitle', 'doctorRole', 'patientGender']) &&
              validStringLength('uid', 1, 128) &&
              validStringLength('doctorName', 1, 100) &&
              validStringLength('patientFirstName', 1, 100) &&
@@ -86,6 +86,9 @@ service cloud.firestore {
              validStringLength('startDate', 1, 20) &&
              validStringLength('endDate', 1, 20) &&
              (!('certificateDate' in data) || validStringLength('certificateDate', 1, 20)) &&
+             (!('doctorTitle' in data) || validStringLength('doctorTitle', 1, 20)) &&
+             (!('doctorRole' in data) || validStringLength('doctorRole', 1, 50)) &&
+             (!('patientGender' in data) || validStringLength('patientGender', 1, 10)) &&
              data.createdAt is timestamp;
     }
 

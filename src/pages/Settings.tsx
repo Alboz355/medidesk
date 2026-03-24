@@ -11,6 +11,14 @@ export function Settings({ user }: { user: any }) {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [savingKey, setSavingKey] = useState(false);
+  const [savingInfo, setSavingInfo] = useState(false);
+  const [defaultInfo, setDefaultInfo] = useState({
+    firstName: '',
+    lastName: '',
+    dob: '',
+    eds: '',
+    gender: 'né'
+  });
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -23,6 +31,13 @@ export function Settings({ user }: { user: any }) {
         const apiSnap = await getDoc(doc(db, 'settings', 'api'));
         if (apiSnap.exists() && apiSnap.data().convertApiKey) {
           setConvertApiKey(apiSnap.data().convertApiKey);
+        }
+
+        if (user?.uid) {
+          const userSnap = await getDoc(doc(db, 'users', user.uid));
+          if (userSnap.exists() && userSnap.data().defaultInfo) {
+            setDefaultInfo(userSnap.data().defaultInfo);
+          }
         }
       } catch (error) {
         console.error("Erreur lors de la récupération des paramètres:", error);
@@ -46,6 +61,23 @@ export function Settings({ user }: { user: any }) {
       toast.error('Erreur lors de la sauvegarde de la clé API');
     } finally {
       setSavingKey(false);
+    }
+  };
+
+  const saveDefaultInfo = async () => {
+    if (!user?.uid) return;
+    setSavingInfo(true);
+    try {
+      await setDoc(doc(db, 'users', user.uid), {
+        defaultInfo,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+      toast.success('Informations personnelles sauvegardées avec succès');
+    } catch (error) {
+      console.error("Erreur lors de la sauvegarde des infos:", error);
+      toast.error('Erreur lors de la sauvegarde des informations');
+    } finally {
+      setSavingInfo(false);
     }
   };
 
@@ -134,7 +166,10 @@ export function Settings({ user }: { user: any }) {
             <code className="bg-gray-200 px-1 py-0.5 rounded text-gray-800 font-mono text-xs ml-1">{'{DATE_JOUR}'}</code> ou <code className="bg-gray-200 px-1 py-0.5 rounded text-gray-800 font-mono text-xs">{'{DATE_DU_JOUR}'}</code>, 
             <code className="bg-gray-200 px-1 py-0.5 rounded text-gray-800 font-mono text-xs ml-1">{'{DUREE1}'}</code>, 
             <code className="bg-gray-200 px-1 py-0.5 rounded text-gray-800 font-mono text-xs ml-1">{'{DUREE2}'}</code>, 
-            <code className="bg-gray-200 px-1 py-0.5 rounded text-gray-800 font-mono text-xs ml-1">{'{DOCTEUR}'}</code>
+            <code className="bg-gray-200 px-1 py-0.5 rounded text-gray-800 font-mono text-xs ml-1">{'{DOCTEUR}'}</code>,
+            <code className="bg-gray-200 px-1 py-0.5 rounded text-gray-800 font-mono text-xs ml-1">{'{hof}'}</code>,
+            <code className="bg-gray-200 px-1 py-0.5 rounded text-gray-800 font-mono text-xs ml-1">{'{i/a}'}</code>,
+            <code className="bg-gray-200 px-1 py-0.5 rounded text-gray-800 font-mono text-xs ml-1">{'{né}'}</code>
           </p>
 
           {loading ? (
@@ -185,6 +220,83 @@ export function Settings({ user }: { user: any }) {
           )}
         </div>
       </div>
+      <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/40 border border-gray-100 p-5 sm:p-8 max-w-2xl mt-8">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Informations personnelles par défaut</h3>
+        
+        <div className="bg-gray-50 rounded-xl p-4 sm:p-6 border border-gray-200">
+          <p className="text-sm text-gray-600 mb-6">
+            Ces informations pourront être pré-remplies automatiquement lors de la création d'un nouveau certificat.
+          </p>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Prénom</label>
+                <input
+                  type="text"
+                  value={defaultInfo.firstName}
+                  onChange={(e) => setDefaultInfo({ ...defaultInfo, firstName: e.target.value })}
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-gray-900 focus:border-gray-900 sm:text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
+                <input
+                  type="text"
+                  value={defaultInfo.lastName}
+                  onChange={(e) => setDefaultInfo({ ...defaultInfo, lastName: e.target.value })}
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-gray-900 focus:border-gray-900 sm:text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date de naissance</label>
+                <input
+                  type="date"
+                  value={defaultInfo.dob}
+                  onChange={(e) => setDefaultInfo({ ...defaultInfo, dob: e.target.value })}
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-gray-900 focus:border-gray-900 sm:text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Genre</label>
+                <select
+                  value={defaultInfo.gender}
+                  onChange={(e) => setDefaultInfo({ ...defaultInfo, gender: e.target.value })}
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-gray-900 focus:border-gray-900 sm:text-sm"
+                >
+                  <option value="né">Homme (né le)</option>
+                  <option value="née">Femme (née le)</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">N° EDS</label>
+              <input
+                type="text"
+                value={defaultInfo.eds}
+                onChange={(e) => setDefaultInfo({ ...defaultInfo, eds: e.target.value })}
+                className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-gray-900 focus:border-gray-900 sm:text-sm"
+              />
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                onClick={saveDefaultInfo}
+                disabled={savingInfo}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 disabled:opacity-50"
+              >
+                {savingInfo ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                Enregistrer les infos
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/40 border border-gray-100 p-5 sm:p-8 max-w-2xl mt-8">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Conversion PDF Parfaite (Global)</h3>
         

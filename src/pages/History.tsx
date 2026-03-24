@@ -15,6 +15,7 @@ export function History({ user, onEdit }: { user: any, onEdit: (data: any) => vo
   const [convertApiKey, setConvertApiKey] = useState<string | null>(null);
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [generatingFormat, setGeneratingFormat] = useState<'pdf' | 'docx' | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -40,16 +41,19 @@ export function History({ user, onEdit }: { user: any, onEdit: (data: any) => vo
 
     const q = query(
       collection(db, 'certificates'),
-      where('uid', '==', user.uid),
-      orderBy('createdAt', 'desc'),
-      limit(5)
+      where('uid', '==', user.uid)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const certs = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }));
+      })).sort((a: any, b: any) => {
+        // Sort in memory instead of requiring a composite index
+        const dateA = a.createdAt?.toMillis() || 0;
+        const dateB = b.createdAt?.toMillis() || 0;
+        return dateB - dateA;
+      });
       setCertificates(certs);
       setLoading(false);
     }, (error) => {
@@ -86,7 +90,10 @@ export function History({ user, onEdit }: { user: any, onEdit: (data: any) => vo
               DATE_DU_JOUR: dateJour,
               DUREE1: duree1,
               DUREE2: duree2,
-              DOCTEUR: doctorName
+              DOCTEUR: doctorName,
+              hof: data.doctorTitle || 'Docteur',
+              "i/a": data.doctorRole || 'interne',
+              "né": data.patientGender || 'né'
           };
 
           const fileName = `Certificat_${data.patientLastName}_${format(new Date(), 'yyyyMMdd')}.${formatType}`;
@@ -109,7 +116,7 @@ export function History({ user, onEdit }: { user: any, onEdit: (data: any) => vo
     doc.setFontSize(12);
 
     // Header info
-    doc.text(`${data.patientFirstName} ${data.patientLastName}, né le ${ddn}`, 20, 40);
+    doc.text(`Concerne : ${data.patientFirstName} ${data.patientLastName}, ${data.patientGender || 'né'} le ${ddn}`, 20, 40);
     doc.text(`N° EDS : ${data.eds}`, 20, 50);
     
     // Date
@@ -120,7 +127,8 @@ export function History({ user, onEdit }: { user: any, onEdit: (data: any) => vo
     doc.text(`Ne pourra pas fréquenter l'école du ${duree1} au ${duree2}`, 20, 100);
 
     // Footer
-    doc.text(`Docteur ${doctorName} Médecin interne`, 120, 140);
+    doc.text(`${data.doctorTitle || 'Docteur'} ${doctorName}`, 120, 140);
+    doc.text(`Médecin ${data.doctorRole || 'interne'}`, 120, 148);
     
     // Save
     doc.save(`Certificat_${data.patientLastName}_${format(new Date(), 'yyyyMMdd')}.pdf`);
@@ -135,13 +143,13 @@ export function History({ user, onEdit }: { user: any, onEdit: (data: any) => vo
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('Voulez-vous vraiment supprimer ce certificat de l\'historique ?')) {
-      try {
-        await deleteDoc(doc(db, 'certificates', id));
-        toast.success('Certificat supprimé');
-      } catch (error) {
-        toast.error('Erreur lors de la suppression');
-      }
+    try {
+      await deleteDoc(doc(db, 'certificates', id));
+      toast.success('Certificat supprimé');
+    } catch (error) {
+      toast.error('Erreur lors de la suppression');
+    } finally {
+      setDeleteConfirmId(null);
     }
   };
 
@@ -149,7 +157,7 @@ export function History({ user, onEdit }: { user: any, onEdit: (data: any) => vo
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="mb-8">
         <h2 className="text-3xl font-semibold text-gray-900 tracking-tight">Historique</h2>
-        <p className="text-gray-500 mt-2">Vos 5 derniers certificats générés.</p>
+        <p className="text-gray-500 mt-2">Tous vos certificats générés.</p>
       </div>
 
       {loading ? (
@@ -221,13 +229,30 @@ export function History({ user, onEdit }: { user: any, onEdit: (data: any) => vo
                   )}
                   PDF
                 </button>
-                <button
-                  onClick={() => handleDelete(cert.id)}
-                  className="flex-1 sm:flex-none flex items-center justify-center p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  title="Supprimer"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                {deleteConfirmId === cert.id ? (
+                  <div className="flex items-center gap-2 flex-1 sm:flex-none">
+                    <button
+                      onClick={() => handleDelete(cert.id)}
+                      className="flex-1 sm:flex-none flex items-center justify-center px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors duration-200 text-sm"
+                    >
+                      Confirmer
+                    </button>
+                    <button
+                      onClick={() => setDeleteConfirmId(null)}
+                      className="flex-1 sm:flex-none flex items-center justify-center px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors duration-200 text-sm"
+                    >
+                      Annuler
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setDeleteConfirmId(cert.id)}
+                    className="flex-1 sm:flex-none flex items-center justify-center p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Supprimer"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
           ))}

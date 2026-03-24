@@ -40,6 +40,23 @@
           "format": "date",
           "description": "The end date of the absence."
         },
+        "certificateDate": {
+          "type": "string",
+          "format": "date",
+          "description": "The date of the certificate."
+        },
+        "doctorTitle": {
+          "type": "string",
+          "description": "The title of the doctor (e.g., Docteur, Docteure)."
+        },
+        "doctorRole": {
+          "type": "string",
+          "description": "The role of the doctor (e.g., interne, associé)."
+        },
+        "patientGender": {
+          "type": "string",
+          "description": "The gender of the patient (e.g., né, née)."
+        },
         "createdAt": {
           "type": "string",
           "format": "date-time",
