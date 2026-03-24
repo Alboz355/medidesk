@@ -8,7 +8,7 @@ import { fr } from 'date-fns/locale';
 import { collection, addDoc, serverTimestamp, getDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { toast } from 'sonner';
-import { FileText, Loader2, Download } from 'lucide-react';
+import { FileText, Loader2, Download, Pencil } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { generateAndDownloadPDF, generateAndDownloadDOCX } from '../lib/pdfGenerator';
 
@@ -25,11 +25,43 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-export function CertificateForm({ user }: { user: any }) {
+export function CertificateForm({ user, editData, onClearEdit }: { user: any, editData?: any, onClearEdit?: () => void }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [submitFormat, setSubmitFormat] = useState<'pdf' | 'docx' | null>(null);
   const [templateBase64, setTemplateBase64] = useState<string | null>(null);
   const [convertApiKey, setConvertApiKey] = useState<string | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<FormData>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      doctorName: user?.displayName || '',
+      certificateDate: format(new Date(), 'yyyy-MM-dd'),
+    }
+  });
+
+  useEffect(() => {
+    if (editData) {
+      reset({
+        doctorName: editData.doctorName || '',
+        patientFirstName: editData.patientFirstName || '',
+        patientLastName: editData.patientLastName || '',
+        patientDob: editData.patientDob || '',
+        eds: editData.eds || '',
+        startDate: editData.startDate || '',
+        endDate: editData.endDate || '',
+        certificateDate: editData.certificateDate || format(new Date(), 'yyyy-MM-dd'),
+      });
+      setIsEditMode(true);
+      toast.info("Données du certificat chargées pour modification.");
+      if (onClearEdit) onClearEdit();
+    }
+  }, [editData, reset, onClearEdit]);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -49,19 +81,6 @@ export function CertificateForm({ user }: { user: any }) {
     };
     fetchSettings();
   }, []);
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<FormData>({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      doctorName: user?.displayName || '',
-      certificateDate: format(new Date(), 'yyyy-MM-dd'),
-    }
-  });
 
   const generateDocument = async (data: FormData, formatType: 'pdf' | 'docx') => {
     const dateJour = format(new Date(data.certificateDate), 'dd.MM.yyyy');
@@ -143,6 +162,7 @@ export function CertificateForm({ user }: { user: any }) {
       
       toast.success('Certificat généré et sauvegardé avec succès');
       reset({ ...data, patientFirstName: '', patientLastName: '', patientDob: '', eds: '', startDate: '', endDate: '', certificateDate: format(new Date(), 'yyyy-MM-dd') });
+      setIsEditMode(false);
     } catch (error) {
       console.error('Error generating certificate:', error);
       toast.error('Erreur lors de la génération du certificat');
@@ -154,9 +174,17 @@ export function CertificateForm({ user }: { user: any }) {
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="mb-8">
-        <h2 className="text-3xl font-semibold text-gray-900 tracking-tight">Nouveau Certificat</h2>
-        <p className="text-gray-500 mt-2">Générez un certificat d'absence scolaire au format PDF ou Word.</p>
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-semibold text-gray-900 tracking-tight">Nouveau Certificat</h2>
+          <p className="text-gray-500 mt-2">Générez un certificat d'absence scolaire au format PDF ou Word.</p>
+        </div>
+        {isEditMode && (
+          <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-medium border border-blue-100">
+            <Pencil className="w-4 h-4" />
+            Mode Modification
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/40 border border-gray-100 p-5 sm:p-8 max-w-2xl">

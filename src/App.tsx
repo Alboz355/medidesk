@@ -11,6 +11,7 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('certificate');
+  const [editData, setEditData] = useState<any>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -94,9 +95,9 @@ export default function App() {
       />
       <main className="flex-1 overflow-y-auto pb-20 pt-16 md:pb-0 md:pt-0">
         <div className="max-w-5xl mx-auto p-4 md:p-8">
-          {activeTab === 'certificate' && <CertificateForm user={user} />}
-          {activeTab === 'history' && <History user={user} />}
-          {activeTab === 'settings' && <Settings />}
+          {activeTab === 'certificate' && <CertificateForm user={user} editData={editData} onClearEdit={() => setEditData(null)} />}
+          {activeTab === 'history' && <History user={user} onEdit={(data) => { setEditData(data); setActiveTab('certificate'); }} />}
+          {activeTab === 'settings' && <Settings user={user} />}
         </div>
       </main>
     </div>

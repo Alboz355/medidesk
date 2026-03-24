@@ -96,6 +96,12 @@ service cloud.firestore {
              data.updatedAt is timestamp;
     }
 
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "leartshabija@gmail.com" && request.auth.token.email_verified == true));
+    }
+
     function isValidSetting(data) {
       return hasOnlyAllowedFields(['convertApiKey', 'updatedAt']) &&
              (data.convertApiKey is string || data.convertApiKey == null) &&
@@ -106,28 +112,32 @@ service cloud.firestore {
     // Rules
     // ===============================================================
 
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow update: if isAuthenticated() && (isAdmin() || (isOwner(userId) && request.resource.data.role == resource.data.role));
+    }
+
     match /certificates/{certificateId} {
-      allow read: if isDocOwner();
+      allow read: if isDocOwner() || isAdmin();
       allow create: if isAuthenticated() && 
                        isValidCertificate(request.resource.data) && 
                        uidUnchanged();
-      allow update: if isDocOwner() && 
+      allow update: if (isDocOwner() || isAdmin()) && 
                        isValidCertificate(request.resource.data) && 
                        uidNotModified() &&
                        areImmutableFieldsUnchanged(['createdAt']);
-      allow delete: if isDocOwner();
+      allow delete: if isDocOwner() || isAdmin();
     }
 
     match /templates/{templateId} {
       allow read: if isAuthenticated();
-      allow create, update: if isAuthenticated() && isValidTemplate(request.resource.data);
-      allow delete: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
     }
 
     match /settings/{settingId} {
       allow read: if isAuthenticated();
-      allow create, update: if isAuthenticated() && isValidSetting(request.resource.data);
-      allow delete: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
     }
   }
 }

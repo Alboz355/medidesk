@@ -1,17 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { collection, query, where, orderBy, limit, onSnapshot, getDoc, doc } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, onSnapshot, getDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { jsPDF } from 'jspdf';
-import PizZip from 'pizzip';
-import Docxtemplater from 'docxtemplater';
-import { saveAs } from 'file-saver';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { FileText, Download, Calendar, User, Loader2 } from 'lucide-react';
+import { FileText, Download, Calendar, User, Loader2, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateAndDownloadPDF, generateAndDownloadDOCX } from '../lib/pdfGenerator';
 
-export function History({ user }: { user: any }) {
+export function History({ user, onEdit }: { user: any, onEdit: (data: any) => void }) {
   const [certificates, setCertificates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [templateBase64, setTemplateBase64] = useState<string | null>(null);
@@ -133,6 +130,21 @@ export function History({ user }: { user: any }) {
     }
   };
 
+  const handleEdit = (cert: any) => {
+    onEdit(cert);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Voulez-vous vraiment supprimer ce certificat de l\'historique ?')) {
+      try {
+        await deleteDoc(doc(db, 'certificates', id));
+        toast.success('Certificat supprimé');
+      } catch (error) {
+        toast.error('Erreur lors de la suppression');
+      }
+    }
+  };
+
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="mb-8">
@@ -178,6 +190,14 @@ export function History({ user }: { user: any }) {
               </div>
               <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto mt-3 sm:mt-0">
                 <button
+                  onClick={() => handleEdit(cert)}
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-white border border-gray-200 hover:border-blue-600 text-gray-700 hover:text-blue-600 rounded-lg font-medium transition-colors duration-200 text-sm"
+                  title="Modifier"
+                >
+                  <Pencil className="w-4 h-4" />
+                  Modifier
+                </button>
+                <button
                   onClick={() => generateDocument(cert, 'docx')}
                   disabled={generatingId === cert.id}
                   className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-white border border-gray-200 hover:border-gray-900 text-gray-700 hover:text-gray-900 rounded-lg font-medium transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed text-sm"
@@ -200,6 +220,13 @@ export function History({ user }: { user: any }) {
                     <Download className="w-4 h-4" />
                   )}
                   PDF
+                </button>
+                <button
+                  onClick={() => handleDelete(cert.id)}
+                  className="flex-1 sm:flex-none flex items-center justify-center p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Supprimer"
+                >
+                  <Trash2 className="w-4 h-4" />
                 </button>
               </div>
             </div>
