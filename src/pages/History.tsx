@@ -4,10 +4,11 @@ import { db } from '../firebase';
 import { jsPDF } from 'jspdf';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { FileText, Download, Calendar, User, Loader2, Pencil, Trash2 } from 'lucide-react';
+import { FileText, Download, Calendar, User, Loader2, Pencil, Trash2, Mail } from 'lucide-react';
 import { toast } from 'sonner';
-import { generateAndDownloadPDF, generateAndDownloadDOCX } from '../lib/pdfGenerator';
+import { generateAndDownloadPDF, generateAndDownloadDOCX, generatePDFBlob } from '../lib/pdfGenerator';
 import { PasswordPrompt } from '../components/PasswordPrompt';
+import { SendEmailModal } from '../components/SendEmailModal';
 
 export function History({ user, onEdit }: { user: any, onEdit: (data: any) => void }) {
   const [certificates, setCertificates] = useState<any[]>([]);
@@ -15,10 +16,11 @@ export function History({ user, onEdit }: { user: any, onEdit: (data: any) => vo
   const [templateBase64, setTemplateBase64] = useState<string | null>(null);
   const [convertApiKey, setConvertApiKey] = useState<string | null>(null);
   const [generatingId, setGeneratingId] = useState<string | null>(null);
-  const [generatingFormat, setGeneratingFormat] = useState<'pdf' | 'docx' | null>(null);
+  const [generatingFormat, setGeneratingFormat] = useState<'pdf' | 'docx' | 'email' | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [pendingAction, setPendingAction] = useState<{cert: any, format: 'pdf' | 'docx'} | null>(null);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState<{cert: any, format: 'pdf' | 'docx' | 'email'} | null>(null);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -68,15 +70,96 @@ export function History({ user, onEdit }: { user: any, onEdit: (data: any) => vo
     return () => unsubscribe();
   }, [user]);
 
-  const handleGenerateClick = (cert: any, formatType: 'pdf' | 'docx') => {
+  const handleGenerateClick = (cert: any, formatType: 'pdf' | 'docx' | 'email') => {
     setPendingAction({ cert, format: formatType });
     setShowPassword(true);
+  };
+
+  const handleSendEmail = async (email: string) => {
+    if (!pendingAction || !templateBase64) return;
+    const { cert: data } = pendingAction;
+    
+    try {
+      const doctorName = data.doctorName || user?.displayName || 'Docteur';
+      const dateJour = data.certificateDate 
+        ? format(new Date(data.certificateDate), 'dd.MM.yyyy') 
+        : data.createdAt 
+          ? format(data.createdAt.toDate(), 'dd.MM.yyyy') 
+          : format(new Date(), 'dd.MM.yyyy');
+      const ddn = format(new Date(data.patientDob), 'dd.MM.yyyy');
+      const duree1 = format(new Date(data.startDate), 'dd.MM.yyyy');
+      const duree2 = format(new Date(data.endDate), 'dd.MM.yyyy');
+
+      const templateData = {
+        PRENOM: data.patientFirstName,
+        NOM: data.patientLastName,
+        DDN: ddn,
+        EDS: data.eds,
+        DATE_JOUR: dateJour,
+        DATE_DU_JOUR: dateJour,
+        DUREE1: duree1,
+        DUREE2: duree2,
+        DOCTEUR: doctorName,
+        hof: data.doctorTitle || 'Docteur',
+        "i/a": data.doctorRole || 'interne',
+        "né": data.patientGender || 'né'
+      };
+
+      const pdfBlob = await generatePDFBlob(templateBase64, templateData, convertApiKey);
+      
+      const reader = new FileReader();
+      reader.readAsDataURL(pdfBlob);
+      await new Promise((resolve) => {
+        reader.onloadend = resolve;
+      });
+      const base64Content = (reader.result as string).split(',')[1];
+
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: email,
+          subject: `Certificat Médical - ${data.patientFirstName} ${data.patientLastName}`,
+          html: `
+            <div style="font-family: sans-serif; line-height: 1.5; color: #333;">
+              <h2>Bonjour,</h2>
+              <p>Veuillez trouver ci-joint le certificat médical de <strong>${data.patientFirstName} ${data.patientLastName}</strong>.</p>
+              <p>Cordialement,<br/>${data.doctorTitle || 'Docteur'} ${doctorName}</p>
+            </div>
+          `,
+          attachments: [
+            {
+              filename: `Certificat_${data.patientLastName}.pdf`,
+              content: base64Content,
+            },
+          ],
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.details || errorData.error || 'Failed to send email');
+      }
+
+      toast.success('Email envoyé avec succès au patient');
+    } catch (error) {
+      console.error('Error sending email:', error);
+      toast.error('Erreur lors de l\'envoi de l\'email');
+      throw error;
+    }
   };
 
   const executeGeneration = async () => {
     if (!pendingAction) return;
     const { cert: data, format: formatType } = pendingAction;
     
+    if (formatType === 'email') {
+      setShowEmailModal(true);
+      return;
+    }
+
     setGeneratingId(data.id);
     setGeneratingFormat(formatType);
     try {
@@ -172,6 +255,15 @@ export function History({ user, onEdit }: { user: any, onEdit: (data: any) => vo
         onClose={() => setShowPassword(false)} 
         onSuccess={executeGeneration} 
       />
+      <SendEmailModal
+        isOpen={showEmailModal}
+        onClose={() => {
+          setShowEmailModal(false);
+          setPendingAction(null);
+        }}
+        onSend={handleSendEmail}
+        patientName={pendingAction?.cert ? `${pendingAction.cert.patientFirstName} ${pendingAction.cert.patientLastName}` : ''}
+      />
       <div className="mb-6 sm:mb-8">
         <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 tracking-tight">Historique</h2>
         <p className="text-sm sm:text-base text-gray-500 mt-1 sm:mt-2">Tous vos certificats générés.</p>
@@ -237,7 +329,7 @@ export function History({ user, onEdit }: { user: any, onEdit: (data: any) => vo
                 <button
                   onClick={() => handleGenerateClick(cert, 'pdf')}
                   disabled={generatingId === cert.id}
-                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-gray-50 hover:bg-gray-900 text-gray-700 hover:text-white rounded-lg font-medium transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed text-sm"
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-white border border-gray-200 hover:border-gray-900 text-gray-700 hover:text-gray-900 rounded-lg font-medium transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed text-sm"
                 >
                   {generatingId === cert.id && generatingFormat === 'pdf' ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -245,6 +337,14 @@ export function History({ user, onEdit }: { user: any, onEdit: (data: any) => vo
                     <Download className="w-4 h-4" />
                   )}
                   PDF
+                </button>
+                <button
+                  onClick={() => handleGenerateClick(cert, 'email')}
+                  disabled={generatingId === cert.id}
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-gray-50 hover:bg-gray-900 text-gray-700 hover:text-white rounded-lg font-medium transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed text-sm"
+                >
+                  <Mail className="w-4 h-4" />
+                  Email
                 </button>
                 {deleteConfirmId === cert.id ? (
                   <div className="flex items-center gap-2 flex-1 sm:flex-none">

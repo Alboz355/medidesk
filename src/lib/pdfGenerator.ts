@@ -5,59 +5,47 @@ import { renderAsync } from 'docx-preview';
 import html2pdf from 'html2pdf.js';
 import { saveAs } from 'file-saver';
 
+export async function generateDOCXBlob(
+  templateBase64: string,
+  data: any
+): Promise<Blob> {
+  const binaryString = window.atob(templateBase64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+  }
+  
+  const zip = new PizZip(bytes.buffer);
+  const doc = new Docxtemplater(zip, {
+      paragraphLoop: true,
+      linebreaks: true,
+  });
+
+  doc.render(data);
+
+  return doc.getZip().generate({
+      type: 'blob',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  });
+}
+
 export async function generateAndDownloadDOCX(
   templateBase64: string,
   data: any,
   fileName: string
 ) {
-  const binaryString = window.atob(templateBase64);
-  const len = binaryString.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-  }
-  
-  const zip = new PizZip(bytes.buffer);
-  const doc = new Docxtemplater(zip, {
-      paragraphLoop: true,
-      linebreaks: true,
-  });
-
-  doc.render(data);
-
-  const out = doc.getZip().generate({
-      type: 'blob',
-      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  });
+  const out = await generateDOCXBlob(templateBase64, data);
   saveAs(out, fileName);
 }
 
-export async function generateAndDownloadPDF(
+export async function generatePDFBlob(
   templateBase64: string,
   data: any,
-  fileName: string,
   convertApiKey?: string | null
-) {
+): Promise<Blob> {
   // 1. Generate DOCX with docxtemplater
-  const binaryString = window.atob(templateBase64);
-  const len = binaryString.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-  }
-  
-  const zip = new PizZip(bytes.buffer);
-  const doc = new Docxtemplater(zip, {
-      paragraphLoop: true,
-      linebreaks: true,
-  });
-
-  doc.render(data);
-
-  const docxBlob = doc.getZip().generate({
-      type: 'blob',
-      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  });
+  const docxBlob = await generateDOCXBlob(templateBase64, data);
 
   // If ConvertAPI key is provided, use it for perfect conversion
   if (convertApiKey) {
@@ -100,9 +88,7 @@ export async function generateAndDownloadPDF(
           byteNumbers[i] = byteCharacters.charCodeAt(i);
       }
       const byteArray = new Uint8Array(byteNumbers);
-      const pdfBlob = new Blob([byteArray], {type: 'application/pdf'});
-      saveAs(pdfBlob, fileName);
-      return;
+      return new Blob([byteArray], {type: 'application/pdf'});
     } catch (error) {
       console.error("ConvertAPI failed, falling back to local rendering", error);
     }
@@ -134,13 +120,11 @@ export async function generateAndDownloadPDF(
       debug: false,
     });
 
-    // Find the actual page section to avoid wrapper padding/background
     const section = (container.querySelector('section.docx') as HTMLElement) || container;
     
     // 3. Convert HTML to PDF
     const opt = {
       margin:       0,
-      filename:     fileName,
       image:        { type: 'jpeg' as const, quality: 1 },
       html2canvas:  { 
         scale: 2, 
@@ -152,9 +136,20 @@ export async function generateAndDownloadPDF(
       jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
     };
 
-    await html2pdf().set(opt).from(section).save();
+    const pdf = await html2pdf().set(opt).from(section).output('blob');
+    return pdf;
   } finally {
-    // Cleanup
     document.body.removeChild(container);
   }
 }
+
+export async function generateAndDownloadPDF(
+  templateBase64: string,
+  data: any,
+  fileName: string,
+  convertApiKey?: string | null
+) {
+  const pdfBlob = await generatePDFBlob(templateBase64, data, convertApiKey);
+  saveAs(pdfBlob, fileName);
+}
+

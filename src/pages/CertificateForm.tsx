@@ -8,10 +8,11 @@ import { fr } from 'date-fns/locale';
 import { collection, addDoc, serverTimestamp, getDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { toast } from 'sonner';
-import { FileText, Loader2, Download, Pencil, User } from 'lucide-react';
+import { FileText, Loader2, Download, Pencil, User, Mail } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { generateAndDownloadPDF, generateAndDownloadDOCX } from '../lib/pdfGenerator';
+import { generateAndDownloadPDF, generateAndDownloadDOCX, generatePDFBlob } from '../lib/pdfGenerator';
 import { PasswordPrompt } from '../components/PasswordPrompt';
+import { SendEmailModal } from '../components/SendEmailModal';
 
 const schema = z.object({
   doctorName: z.string().min(1, 'Le nom du médecin est requis').max(100),
@@ -36,7 +37,8 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
   const [convertApiKey, setConvertApiKey] = useState<string | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [pendingData, setPendingData] = useState<{data: any, formatType: 'pdf' | 'docx'} | null>(null);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [pendingData, setPendingData] = useState<{data: any, formatType: 'pdf' | 'docx' | 'email'} | null>(null);
 
   const {
     register,
@@ -177,15 +179,86 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
     doc.save(`Certificat_${data.patientLastName}_${format(new Date(), 'yyyyMMdd')}.pdf`);
   };
 
-  const onSubmit = async (data: FormData, formatType: 'pdf' | 'docx') => {
+  const onSubmit = async (data: FormData, formatType: 'pdf' | 'docx' | 'email') => {
     setPendingData({ data, formatType });
     setShowPassword(true);
+  };
+
+  const handleSendEmail = async (email: string) => {
+    if (!pendingData || !templateBase64) return;
+    const { data } = pendingData;
+    
+    const dateJour = format(new Date(data.certificateDate), 'dd.MM.yyyy');
+    const ddn = format(new Date(data.patientDob), 'dd.MM.yyyy');
+    const duree1 = format(new Date(data.startDate), 'dd.MM.yyyy');
+    const duree2 = format(new Date(data.endDate), 'dd.MM.yyyy');
+
+    const templateData = {
+      PRENOM: data.patientFirstName,
+      NOM: data.patientLastName,
+      DDN: ddn,
+      EDS: data.eds,
+      DATE_JOUR: dateJour,
+      DATE_DU_JOUR: dateJour,
+      DUREE1: duree1,
+      DUREE2: duree2,
+      DOCTEUR: data.doctorName,
+      hof: data.doctorTitle,
+      "i/a": data.doctorRole,
+      "né": data.patientGender
+    };
+
+    const pdfBlob = await generatePDFBlob(templateBase64, templateData, convertApiKey);
+    
+    // Convert blob to base64 for the API
+    const reader = new FileReader();
+    reader.readAsDataURL(pdfBlob);
+    await new Promise((resolve) => {
+      reader.onloadend = resolve;
+    });
+    const base64Content = (reader.result as string).split(',')[1];
+
+    const response = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        to: email,
+        subject: `Certificat Médical - ${data.patientFirstName} ${data.patientLastName}`,
+        html: `
+          <div style="font-family: sans-serif; line-height: 1.5; color: #333;">
+            <h2>Bonjour,</h2>
+            <p>Veuillez trouver ci-joint le certificat médical de <strong>${data.patientFirstName} ${data.patientLastName}</strong>.</p>
+            <p>Cordialement,<br/>${data.doctorTitle} ${data.doctorName}</p>
+          </div>
+        `,
+        attachments: [
+          {
+            filename: `Certificat_${data.patientLastName}.pdf`,
+            content: base64Content,
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.details || errorData.error || 'Failed to send email');
+    }
+
+    toast.success('Email envoyé avec succès au patient');
   };
 
   const executeGeneration = async () => {
     if (!pendingData) return;
     const { data, formatType } = pendingData;
     
+    if (formatType === 'email') {
+      setShowEmailModal(true);
+      return;
+    }
+
     setIsGenerating(true);
     setSubmitFormat(formatType);
     try {
@@ -228,6 +301,15 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
         isOpen={showPassword} 
         onClose={() => setShowPassword(false)} 
         onSuccess={executeGeneration} 
+      />
+      <SendEmailModal
+        isOpen={showEmailModal}
+        onClose={() => {
+          setShowEmailModal(false);
+          setPendingData(null);
+        }}
+        onSend={handleSendEmail}
+        patientName={pendingData?.data ? `${pendingData.data.patientFirstName} ${pendingData.data.patientLastName}` : ''}
       />
       <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -429,20 +511,29 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
               ) : (
                 <FileText className="w-5 h-5" />
               )}
-              Télécharger Word
+              Word
             </button>
             <button
               type="button"
               onClick={handleSubmit((data) => onSubmit(data, 'pdf'))}
               disabled={isGenerating}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 bg-gray-900 text-white hover:bg-gray-800 rounded-xl font-medium transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed shadow-lg shadow-gray-900/20"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 bg-white border-2 border-gray-200 text-gray-700 hover:border-gray-900 hover:text-gray-900 rounded-xl font-medium transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {isGenerating && submitFormat === 'pdf' ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <Download className="w-5 h-5" />
               )}
-              Télécharger PDF
+              PDF
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit((data) => onSubmit(data, 'email'))}
+              disabled={isGenerating}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 bg-gray-900 text-white hover:bg-gray-800 rounded-xl font-medium transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed shadow-lg shadow-gray-900/20"
+            >
+              <Mail className="w-5 h-5" />
+              Email
             </button>
           </div>
         </form>

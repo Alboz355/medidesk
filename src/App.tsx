@@ -7,6 +7,7 @@ import { CertificateForm } from './pages/CertificateForm';
 import { History } from './pages/History';
 import { Settings } from './pages/Settings';
 import { Admin } from './pages/Admin';
+import { Updates } from './pages/Updates';
 import { Tutorial } from './components/Tutorial';
 import { Toaster } from 'sonner';
 
@@ -129,6 +130,7 @@ export default function App() {
         <div className="max-w-5xl mx-auto p-4 md:p-8">
           {activeTab === 'certificate' && <CertificateForm user={user} editData={editData} onClearEdit={() => setEditData(null)} />}
           {activeTab === 'history' && <History user={user} onEdit={(data) => { setEditData(data); setActiveTab('certificate'); }} />}
+          {activeTab === 'updates' && <Updates />}
           {activeTab === 'settings' && <Settings user={user} />}
           {activeTab === 'admin' && isAdmin && <Admin user={user} />}
         </div>
