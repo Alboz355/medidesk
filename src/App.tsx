@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
-import { auth, googleProvider } from './firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { auth, googleProvider, db } from './firebase';
 import { Sidebar } from './components/Sidebar';
 import { CertificateForm } from './pages/CertificateForm';
 import { History } from './pages/History';
 import { Settings } from './pages/Settings';
+import { Tutorial } from './components/Tutorial';
 import { Toaster } from 'sonner';
 
 export default function App() {
@@ -12,14 +14,39 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('certificate');
   const [editData, setEditData] = useState<any>(null);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
+      if (currentUser) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+          if (!userDoc.exists() || !userDoc.data().hasSeenTutorial) {
+            setShowTutorial(true);
+          }
+        } catch (error) {
+          console.error("Error checking tutorial status:", error);
+        }
+      }
       setLoading(false);
     });
     return () => unsubscribe();
   }, []);
+
+  const handleTutorialComplete = async () => {
+    setShowTutorial(false);
+    if (user) {
+      try {
+        await setDoc(doc(db, 'users', user.uid), {
+          hasSeenTutorial: true,
+          role: user.email === 'leartshabija@gmail.com' ? 'admin' : 'client'
+        }, { merge: true });
+      } catch (error) {
+        console.error("Error saving tutorial state:", error);
+      }
+    }
+  };
 
   const handleLogin = async () => {
     try {
@@ -86,6 +113,7 @@ export default function App() {
   return (
     <div className="flex min-h-screen bg-gray-50 font-sans">
       <Toaster position="top-right" />
+      {showTutorial && <Tutorial onComplete={handleTutorialComplete} />}
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
