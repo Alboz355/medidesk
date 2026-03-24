@@ -6,6 +6,7 @@ import { Sidebar } from './components/Sidebar';
 import { CertificateForm } from './pages/CertificateForm';
 import { History } from './pages/History';
 import { Settings } from './pages/Settings';
+import { Admin } from './pages/Admin';
 import { Tutorial } from './components/Tutorial';
 import { Toaster } from 'sonner';
 
@@ -110,6 +111,8 @@ export default function App() {
     );
   }
 
+  const isAdmin = user.email === 'leartshabija@gmail.com';
+
   return (
     <div className="flex min-h-screen bg-gray-50 font-sans">
       <Toaster position="top-right" />
@@ -120,12 +123,14 @@ export default function App() {
         onLogout={handleLogout}
         userPhoto={user?.photoURL}
         userName={user?.displayName}
+        isAdmin={isAdmin}
       />
       <main className="flex-1 overflow-y-auto pb-20 pt-16 md:pb-0 md:pt-0">
         <div className="max-w-5xl mx-auto p-4 md:p-8">
           {activeTab === 'certificate' && <CertificateForm user={user} editData={editData} onClearEdit={() => setEditData(null)} />}
           {activeTab === 'history' && <History user={user} onEdit={(data) => { setEditData(data); setActiveTab('certificate'); }} />}
           {activeTab === 'settings' && <Settings user={user} />}
+          {activeTab === 'admin' && isAdmin && <Admin user={user} />}
         </div>
       </main>
     </div>

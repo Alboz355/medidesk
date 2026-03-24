@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText, Search, Image as ImageIcon, ScanText, LogOut, Clock, Settings as SettingsIcon } from 'lucide-react';
+import { FileText, Search, Image as ImageIcon, ScanText, LogOut, Clock, Settings as SettingsIcon, Shield } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface SidebarProps {
@@ -8,13 +8,15 @@ interface SidebarProps {
   onLogout: () => void;
   userPhoto: string | null;
   userName: string | null;
+  isAdmin?: boolean;
 }
 
-export function Sidebar({ activeTab, setActiveTab, onLogout, userPhoto, userName }: SidebarProps) {
+export function Sidebar({ activeTab, setActiveTab, onLogout, userPhoto, userName, isAdmin }: SidebarProps) {
   const navItems = [
     { id: 'certificate', label: 'Certificats', icon: FileText },
     { id: 'history', label: 'Historique', icon: Clock },
     { id: 'settings', label: 'Paramètres', icon: SettingsIcon },
+    ...(isAdmin ? [{ id: 'admin', label: 'Administration', icon: Shield }] : []),
   ];
 
   return (
