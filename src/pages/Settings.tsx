@@ -147,9 +147,9 @@ export function Settings({ user }: { user: any }) {
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="mb-8">
-        <h2 className="text-3xl font-semibold text-gray-900 tracking-tight">Paramètres</h2>
-        <p className="text-gray-500 mt-2">Configurez le modèle de certificat Word global pour le cabinet.</p>
+      <div className="mb-6 sm:mb-8">
+        <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 tracking-tight">Paramètres</h2>
+        <p className="text-sm sm:text-base text-gray-500 mt-1 sm:mt-2">Configurez le modèle de certificat Word global pour le cabinet.</p>
       </div>
 
       <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/40 border border-gray-100 p-5 sm:p-8 max-w-2xl">

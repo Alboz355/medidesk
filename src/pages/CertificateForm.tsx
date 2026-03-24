@@ -229,21 +229,21 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
         onClose={() => setShowPassword(false)} 
         onSuccess={executeGeneration} 
       />
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-semibold text-gray-900 tracking-tight">Nouveau Certificat</h2>
-          <p className="text-gray-500 mt-2">Générez un certificat d'absence scolaire au format PDF ou Word.</p>
+          <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 tracking-tight">Nouveau Certificat</h2>
+          <p className="text-sm sm:text-base text-gray-500 mt-1 sm:mt-2">Générez un certificat d'absence scolaire au format PDF ou Word.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
             onClick={loadDefaultInfo}
-            className="bg-white text-gray-700 px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-medium border border-gray-200 hover:bg-gray-50 transition-colors shadow-sm"
+            className="flex-1 sm:flex-none justify-center bg-white text-gray-700 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl flex items-center gap-2 text-sm font-medium border border-gray-200 hover:bg-gray-50 transition-colors shadow-sm"
           >
             <User className="w-4 h-4" />
             Utiliser info perso
           </button>
           {isEditMode && (
-            <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-medium border border-blue-100">
+            <div className="flex-1 sm:flex-none justify-center bg-blue-50 text-blue-700 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl flex items-center gap-2 text-sm font-medium border border-blue-100">
               <Pencil className="w-4 h-4" />
               Mode Modification
             </div>
@@ -251,11 +251,11 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/40 border border-gray-100 p-5 sm:p-8 max-w-2xl">
-        <form className="space-y-6">
+      <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/40 border border-gray-100 p-4 sm:p-5 md:p-8 max-w-2xl">
+        <form className="space-y-5 sm:space-y-6">
           
-          <div className="pb-6 border-b border-gray-100">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div className="pb-5 sm:pb-6 border-b border-gray-100">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">Titre du médecin</label>
                 <select
@@ -287,7 +287,7 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">Médecin signataire</label>
                 <input
@@ -316,7 +316,7 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">Genre du patient</label>
               <select
@@ -333,7 +333,7 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">Prénom du patient</label>
               <input
@@ -361,7 +361,7 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">Date de naissance</label>
               <input
@@ -389,7 +389,7 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">Date de début d'absence</label>
               <input

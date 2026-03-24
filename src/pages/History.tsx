@@ -172,9 +172,9 @@ export function History({ user, onEdit }: { user: any, onEdit: (data: any) => vo
         onClose={() => setShowPassword(false)} 
         onSuccess={executeGeneration} 
       />
-      <div className="mb-8">
-        <h2 className="text-3xl font-semibold text-gray-900 tracking-tight">Historique</h2>
-        <p className="text-gray-500 mt-2">Tous vos certificats générés.</p>
+      <div className="mb-6 sm:mb-8">
+        <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 tracking-tight">Historique</h2>
+        <p className="text-sm sm:text-base text-gray-500 mt-1 sm:mt-2">Tous vos certificats générés.</p>
       </div>
 
       {loading ? (
