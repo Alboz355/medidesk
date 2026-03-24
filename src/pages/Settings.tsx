@@ -8,6 +8,7 @@ export function Settings({ user }: { user: any }) {
   const [templateName, setTemplateName] = useState<string | null>(null);
   const [templateUid, setTemplateUid] = useState<string | null>(null);
   const [convertApiKey, setConvertApiKey] = useState<string>('');
+  const [apiUid, setApiUid] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [savingKey, setSavingKey] = useState(false);
@@ -22,8 +23,9 @@ export function Settings({ user }: { user: any }) {
         }
         
         const apiSnap = await getDoc(doc(db, 'settings', 'api'));
-        if (apiSnap.exists() && apiSnap.data().convertApiKey) {
-          setConvertApiKey(apiSnap.data().convertApiKey);
+        if (apiSnap.exists()) {
+          if (apiSnap.data().convertApiKey) setConvertApiKey(apiSnap.data().convertApiKey);
+          if (apiSnap.data().uid) setApiUid(apiSnap.data().uid);
         }
       } catch (error) {
         console.error("Erreur lors de la récupération des paramètres:", error);
@@ -39,8 +41,10 @@ export function Settings({ user }: { user: any }) {
     try {
       await setDoc(doc(db, 'settings', 'api'), {
         convertApiKey: convertApiKey,
+        uid: user.uid,
         updatedAt: serverTimestamp()
       }, { merge: true });
+      setApiUid(user.uid);
       toast.success('Clé API sauvegardée avec succès');
     } catch (error) {
       console.error("Erreur lors de la sauvegarde de la clé:", error);
@@ -156,7 +160,7 @@ export function Settings({ user }: { user: any }) {
                   <p className="text-xs text-gray-500">{templateName}</p>
                 </div>
               </div>
-              {(!templateUid || templateUid === user?.uid) && (
+              {(templateUid === user?.uid) && (
                 <button
                   onClick={removeTemplate}
                   className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -184,7 +188,7 @@ export function Settings({ user }: { user: any }) {
           )}
         </div>
       </div>
-      {(!templateUid || templateUid === user?.uid) && (
+      {(!apiUid || apiUid === user?.uid) && (
         <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/40 border border-gray-100 p-5 sm:p-8 max-w-2xl mt-8">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Conversion PDF Parfaite (Optionnel)</h3>
 

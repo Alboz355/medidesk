@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { FileText, Loader2, Download } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { generateAndDownloadPDF, generateAndDownloadDOCX } from '../lib/pdfGenerator';
+import { motion } from 'motion/react';
 
 const schema = z.object({
   doctorName: z.string().min(1, 'Le nom du médecin est requis').max(100),
@@ -201,8 +202,12 @@ export function CertificateForm({ user, initialData, onClearEdit }: { user: any,
         )}
       </div>
 
-      <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/40 border border-gray-100 p-5 sm:p-8 max-w-2xl">
-        <form className="space-y-6">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white rounded-3xl shadow-xl shadow-gray-200/40 border border-gray-100 p-6 sm:p-10 max-w-2xl"
+      >
+        <form className="space-y-8">
           
           <div className="pb-6 border-b border-gray-100">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -318,7 +323,7 @@ export function CertificateForm({ user, initialData, onClearEdit }: { user: any,
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 pt-4">
+          <div className="flex flex-col sm:flex-row gap-4 pt-6 mt-8 border-t border-gray-100">
             <button
               type="button"
               onClick={handleSubmit((data) => onSubmit(data, 'docx'))}
@@ -347,7 +352,7 @@ export function CertificateForm({ user, initialData, onClearEdit }: { user: any,
             </button>
           </div>
         </form>
-      </div>
+      </motion.div>
     </div>
   );
 }

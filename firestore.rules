@@ -20,6 +20,13 @@ service cloud.firestore {
     //   - endDate: string (required, max 20 chars) - The end date.
     //   - createdAt: timestamp (required, immutable) - The timestamp when the certificate was created.
     //
+    // Collection: settings
+    // Document ID: auto-generated or specific (e.g., 'api')
+    // Fields:
+    //   - convertApiKey: string (optional)
+    //   - uid: string (optional)
+    //   - updatedAt: timestamp (required)
+    //
     // Collection: templates
     // Document ID: auto-generated or specific (e.g., 'default')
     // Fields:
@@ -99,8 +106,9 @@ service cloud.firestore {
     }
 
     function isValidSetting(data) {
-      return hasOnlyAllowedFields(['convertApiKey', 'updatedAt']) &&
+      return hasOnlyAllowedFields(['convertApiKey', 'updatedAt', 'uid']) &&
              (data.convertApiKey is string || data.convertApiKey == null) &&
+             (!('uid' in data) || validStringLength('uid', 1, 128)) &&
              data.updatedAt is timestamp;
     }
 
@@ -129,8 +137,9 @@ service cloud.firestore {
 
     match /settings/{settingId} {
       allow read: if isAuthenticated();
-      allow create, update: if isAuthenticated() && isValidSetting(request.resource.data);
-      allow delete: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidSetting(request.resource.data);
+      allow update: if isAuthenticated() && isValidSetting(request.resource.data) && (!('uid' in resource.data) || resource.data.uid == request.auth.uid);
+      allow delete: if isAuthenticated() && (!('uid' in resource.data) || resource.data.uid == request.auth.uid);
     }
   }
 }
