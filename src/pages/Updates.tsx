@@ -4,6 +4,17 @@ import { motion } from 'motion/react';
 
 const updates = [
   {
+    date: '27 Mars 2026',
+    title: 'Simplification & Sécurité',
+    icon: Shield,
+    color: 'bg-indigo-500',
+    items: [
+      'Retrait du format Word (DOCX) pour garantir l\'intégrité des certificats (PDF uniquement).',
+      'Ajout d\'un mot de passe maître sécurisé pour un accès simplifié.',
+      'Nettoyage des métadonnées de l\'application pour une meilleure présentation.',
+    ]
+  },
+  {
     date: '24 Mars 2026',
     title: 'Déploiement & Gmail',
     icon: Globe,

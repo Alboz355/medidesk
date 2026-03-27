@@ -17,13 +17,13 @@ export function History({ user, onEdit }: { user: any, onEdit: (data: any) => vo
   const [templateBase64, setTemplateBase64] = useState<string | null>(null);
   const [convertApiKey, setConvertApiKey] = useState<string | null>(null);
   const [generatingId, setGeneratingId] = useState<string | null>(null);
-  const [generatingFormat, setGeneratingFormat] = useState<'pdf' | 'docx' | 'email' | null>(null);
+  const [generatingFormat, setGeneratingFormat] = useState<'pdf' | 'email' | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [showCleanupModal, setShowCleanupModal] = useState(false);
   const [cleanupType, setCleanupType] = useState<'all' | 'old' | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
-  const [pendingAction, setPendingAction] = useState<{cert?: any, format?: 'pdf' | 'docx' | 'email', type?: 'delete' | 'cleanup'} | null>(null);
+  const [pendingAction, setPendingAction] = useState<{cert?: any, format?: 'pdf' | 'email', type?: 'delete' | 'cleanup'} | null>(null);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -73,7 +73,7 @@ export function History({ user, onEdit }: { user: any, onEdit: (data: any) => vo
     return () => unsubscribe();
   }, [user]);
 
-  const handleGenerateClick = (cert: any, formatType: 'pdf' | 'docx' | 'email') => {
+  const handleGenerateClick = (cert: any, formatType: 'pdf' | 'email') => {
     setPendingAction({ cert, format: formatType, type: 'cleanup' }); // Using 'cleanup' as a generic type for password prompt
     setShowPassword(true);
   };
@@ -253,11 +253,7 @@ export function History({ user, onEdit }: { user: any, onEdit: (data: any) => vo
           };
 
           const fileName = `Certificat_${data.patientLastName}_${format(new Date(), 'yyyyMMdd')}.${formatType}`;
-          if (formatType === 'pdf') {
-            await generateAndDownloadPDF(templateBase64, templateData, fileName, convertApiKey);
-          } else {
-            await generateAndDownloadDOCX(templateBase64, templateData, fileName);
-          }
+          await generateAndDownloadPDF(templateBase64, templateData, fileName, convertApiKey);
           return;
         } catch (error) {
           console.error(`Erreur avec le modèle ${formatType}:`, error);
@@ -397,18 +393,6 @@ export function History({ user, onEdit }: { user: any, onEdit: (data: any) => vo
                 >
                   <Pencil className="w-4 h-4" />
                   Modifier
-                </button>
-                <button
-                  onClick={() => handleGenerateClick(cert, 'docx')}
-                  disabled={generatingId === cert.id}
-                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-white border border-gray-200 hover:border-gray-900 text-gray-700 hover:text-gray-900 rounded-lg font-medium transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed text-sm"
-                >
-                  {generatingId === cert.id && generatingFormat === 'docx' ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <FileText className="w-4 h-4" />
-                  )}
-                  Word
                 </button>
                 <button
                   onClick={() => handleGenerateClick(cert, 'pdf')}

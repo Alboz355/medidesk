@@ -34,13 +34,13 @@ type FormData = z.infer<typeof schema>;
 
 export function CertificateForm({ user, editData, onClearEdit }: { user: any, editData?: any, onClearEdit?: () => void }) {
   const [isGenerating, setIsGenerating] = useState(false);
-  const [submitFormat, setSubmitFormat] = useState<'pdf' | 'docx' | null>(null);
+  const [submitFormat, setSubmitFormat] = useState<'pdf' | null>(null);
   const [templateBase64, setTemplateBase64] = useState<string | null>(null);
   const [convertApiKey, setConvertApiKey] = useState<string | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
-  const [pendingData, setPendingData] = useState<{data: any, formatType: 'pdf' | 'docx' | 'email'} | null>(null);
+  const [pendingData, setPendingData] = useState<{data: any, formatType: 'pdf' | 'email'} | null>(null);
 
   const {
     register,
@@ -121,7 +121,7 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
     }
   };
 
-  const generateDocument = async (data: FormData, formatType: 'pdf' | 'docx') => {
+  const generateDocument = async (data: FormData, formatType: 'pdf') => {
     const dateJour = format(new Date(data.certificateDate), 'dd.MM.yyyy');
     const ddn = format(new Date(data.patientDob), 'dd.MM.yyyy');
     const duree1 = format(new Date(data.startDate), 'dd.MM.yyyy');
@@ -145,11 +145,7 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
         };
 
         const fileName = `Certificat_${data.patientLastName}_${format(new Date(), 'yyyyMMdd')}.${formatType}`;
-        if (formatType === 'pdf') {
-          await generateAndDownloadPDF(templateBase64, templateData, fileName, convertApiKey);
-        } else {
-          await generateAndDownloadDOCX(templateBase64, templateData, fileName);
-        }
+        await generateAndDownloadPDF(templateBase64, templateData, fileName, convertApiKey);
         return;
       } catch (error) {
         console.error(`Erreur avec le modèle ${formatType}:`, error);
@@ -182,7 +178,7 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
     doc.save(`Certificat_${data.patientLastName}_${format(new Date(), 'yyyyMMdd')}.pdf`);
   };
 
-  const onSubmit = async (data: FormData, formatType: 'pdf' | 'docx' | 'email') => {
+  const onSubmit = async (data: FormData, formatType: 'pdf' | 'email') => {
     setPendingData({ data, formatType });
     setShowPassword(true);
   };
@@ -503,19 +499,6 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 pt-4">
-            <button
-              type="button"
-              onClick={handleSubmit((data) => onSubmit(data, 'docx'))}
-              disabled={isGenerating}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 bg-white border-2 border-gray-200 text-gray-700 hover:border-gray-900 hover:text-gray-900 rounded-xl font-medium transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {isGenerating && submitFormat === 'docx' ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <FileText className="w-5 h-5" />
-              )}
-              Word
-            </button>
             <button
               type="button"
               onClick={handleSubmit((data) => onSubmit(data, 'pdf'))}
