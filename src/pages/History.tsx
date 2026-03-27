@@ -4,11 +4,12 @@ import { db } from '../firebase';
 import { jsPDF } from 'jspdf';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { FileText, Download, Calendar, User, Loader2, Pencil, Trash2, Mail } from 'lucide-react';
+import { FileText, Download, Calendar, User, Loader2, Pencil, Trash2, Mail, Filter, Trash } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateAndDownloadPDF, generateAndDownloadDOCX, generatePDFBlob } from '../lib/pdfGenerator';
 import { PasswordPrompt } from '../components/PasswordPrompt';
 import { SendEmailModal } from '../components/SendEmailModal';
+import { cn } from '../lib/utils';
 
 export function History({ user, onEdit }: { user: any, onEdit: (data: any) => void }) {
   const [certificates, setCertificates] = useState<any[]>([]);
@@ -18,9 +19,11 @@ export function History({ user, onEdit }: { user: any, onEdit: (data: any) => vo
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [generatingFormat, setGeneratingFormat] = useState<'pdf' | 'docx' | 'email' | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [showCleanupModal, setShowCleanupModal] = useState(false);
+  const [cleanupType, setCleanupType] = useState<'all' | 'old' | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
-  const [pendingAction, setPendingAction] = useState<{cert: any, format: 'pdf' | 'docx' | 'email'} | null>(null);
+  const [pendingAction, setPendingAction] = useState<{cert?: any, format?: 'pdf' | 'docx' | 'email', type?: 'delete' | 'cleanup'} | null>(null);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -71,12 +74,53 @@ export function History({ user, onEdit }: { user: any, onEdit: (data: any) => vo
   }, [user]);
 
   const handleGenerateClick = (cert: any, formatType: 'pdf' | 'docx' | 'email') => {
-    setPendingAction({ cert, format: formatType });
+    setPendingAction({ cert, format: formatType, type: 'cleanup' }); // Using 'cleanup' as a generic type for password prompt
     setShowPassword(true);
   };
 
+  const handleCleanupClick = (type: 'all' | 'old') => {
+    setCleanupType(type);
+    setPendingAction({ type: 'cleanup' });
+    setShowPassword(true);
+  };
+
+  const executeCleanup = async () => {
+    if (!cleanupType || !user?.uid) return;
+    
+    setLoading(true);
+    try {
+      let toDelete = [];
+      if (cleanupType === 'all') {
+        toDelete = [...certificates];
+      } else {
+        const twoYearsAgo = new Date();
+        twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
+        toDelete = certificates.filter(c => {
+          const date = c.createdAt?.toDate() || new Date();
+          return date < twoYearsAgo;
+        });
+      }
+
+      if (toDelete.length === 0) {
+        toast.info("Aucun certificat à supprimer.");
+        return;
+      }
+
+      const promises = toDelete.map(c => deleteDoc(doc(db, 'certificates', c.id)));
+      await Promise.all(promises);
+      toast.success(`${toDelete.length} certificat(s) supprimé(s)`);
+    } catch (error) {
+      console.error("Error during cleanup:", error);
+      toast.error("Erreur lors du nettoyage");
+    } finally {
+      setLoading(false);
+      setCleanupType(null);
+      setPendingAction(null);
+    }
+  };
+
   const handleSendEmail = async (email: string) => {
-    if (!pendingAction || !templateBase64) return;
+    if (!pendingAction || !pendingAction.cert || !templateBase64) return;
     const { cert: data } = pendingAction;
     
     try {
@@ -151,8 +195,26 @@ export function History({ user, onEdit }: { user: any, onEdit: (data: any) => vo
     }
   };
 
-  const executeGeneration = async () => {
+  const executeAction = async () => {
     if (!pendingAction) return;
+    
+    if (pendingAction.type === 'cleanup') {
+      if (cleanupType) {
+        await executeCleanup();
+      } else if (pendingAction.cert && pendingAction.format) {
+        await executeGeneration();
+      }
+      return;
+    }
+    
+    // Legacy support for single generation
+    if (pendingAction.cert && pendingAction.format) {
+      await executeGeneration();
+    }
+  };
+
+  const executeGeneration = async () => {
+    if (!pendingAction || !pendingAction.cert || !pendingAction.format) return;
     const { cert: data, format: formatType } = pendingAction;
     
     if (formatType === 'email') {
@@ -253,7 +315,7 @@ export function History({ user, onEdit }: { user: any, onEdit: (data: any) => vo
       <PasswordPrompt 
         isOpen={showPassword} 
         onClose={() => setShowPassword(false)} 
-        onSuccess={executeGeneration} 
+        onSuccess={executeAction} 
       />
       <SendEmailModal
         isOpen={showEmailModal}
@@ -264,9 +326,31 @@ export function History({ user, onEdit }: { user: any, onEdit: (data: any) => vo
         onSend={handleSendEmail}
         patientName={pendingAction?.cert ? `${pendingAction.cert.patientFirstName} ${pendingAction.cert.patientLastName}` : ''}
       />
-      <div className="mb-6 sm:mb-8">
-        <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 tracking-tight">Historique</h2>
-        <p className="text-sm sm:text-base text-gray-500 mt-1 sm:mt-2">Tous vos certificats générés.</p>
+      <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 tracking-tight">Historique</h2>
+          <p className="text-sm sm:text-base text-gray-500 mt-1 sm:mt-2">Tous vos certificats générés.</p>
+        </div>
+        
+        {certificates.length > 0 && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleCleanupClick('old')}
+              className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 text-gray-600 hover:text-orange-600 hover:border-orange-200 rounded-xl text-sm font-medium transition-all"
+              title="Supprimer les certificats de plus de 2 ans"
+            >
+              <Filter className="w-4 h-4" />
+              Nettoyer (+2 ans)
+            </button>
+            <button
+              onClick={() => handleCleanupClick('all')}
+              className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 text-gray-600 hover:text-red-600 hover:border-red-200 rounded-xl text-sm font-medium transition-all"
+            >
+              <Trash className="w-4 h-4" />
+              Tout supprimer
+            </button>
+          </div>
+        )}
       </div>
 
       {loading ? (

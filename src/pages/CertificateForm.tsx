@@ -22,7 +22,9 @@ const schema = z.object({
   patientLastName: z.string().min(1, 'Le nom est requis').max(100),
   patientGender: z.enum(['né', 'née']),
   patientDob: z.string().min(1, 'La date de naissance est requise'),
-  eds: z.string().min(1, 'Le N° EDS est requis').max(50),
+  eds: z.string()
+    .min(1, 'Le N° EDS est requis')
+    .regex(/^\d{7,8}$/, 'Le N° EDS doit contenir 7 ou 8 chiffres (format Genève)'),
   startDate: z.string().min(1, 'La date de début est requise'),
   endDate: z.string().min(1, 'La date de fin est requise'),
   certificateDate: z.string().min(1, 'La date du certificat est requise'),
@@ -45,6 +47,7 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
     handleSubmit,
     reset,
     setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -333,7 +336,7 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/40 border border-gray-100 p-4 sm:p-5 md:p-8 max-w-2xl">
+      <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/40 border border-gray-100 p-4 sm:p-5 md:p-8">
         <form className="space-y-5 sm:space-y-6">
           
           <div className="pb-5 sm:pb-6 border-b border-gray-100">
