@@ -1,8 +1,21 @@
 import React from 'react';
-import { Rocket, FileText, User, Shield, Key, Mail, Globe, Users } from 'lucide-react';
+import { Rocket, FileText, User, Shield, Key, Mail, Globe, Users, Sparkles } from 'lucide-react';
 import { motion } from 'motion/react';
 
 const updates = [
+  {
+    date: '31 Mars 2026',
+    title: 'Onboarding & Génération Intelligente',
+    icon: Sparkles,
+    color: 'bg-rose-500',
+    items: [
+      'Nouveau formulaire d\'inscription obligatoire pour collecter les informations du patient (Prénom, Nom, Date de naissance).',
+      'Génération automatique et unique d\'un numéro EDS (commençant par 17) pour chaque nouvel utilisateur.',
+      'Pré-remplissage intelligent des données patient lors de la création d\'un certificat, avec possibilité de modification (icône crayon).',
+      'Génération aléatoire de médecins améliorée : adaptation automatique du titre (Docteur/Docteure) selon le genre du prénom généré.',
+      'Amélioration de l\'onglet "Clients" pour l\'administrateur avec un affichage détaillé et déroulant pour chaque certificat.',
+    ]
+  },
   {
     date: '30 Mars 2026',
     title: 'Gestion des Clients',
