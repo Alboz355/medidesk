@@ -1,8 +1,19 @@
 import React from 'react';
-import { Rocket, FileText, User, Shield, Key, Mail, Globe } from 'lucide-react';
+import { Rocket, FileText, User, Shield, Key, Mail, Globe, Users } from 'lucide-react';
 import { motion } from 'motion/react';
 
 const updates = [
+  {
+    date: '30 Mars 2026',
+    title: 'Gestion des Clients',
+    icon: Users,
+    color: 'bg-emerald-500',
+    items: [
+      'Ajout d\'un onglet "Clients" exclusif à l\'administrateur.',
+      'Visualisation de tous les certificats générés par l\'ensemble des utilisateurs.',
+      'Affichage détaillé des informations patients et médecins signataires.',
+    ]
+  },
   {
     date: '27 Mars 2026',
     title: 'Simplification & Sécurité',

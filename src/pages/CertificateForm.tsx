@@ -8,11 +8,12 @@ import { fr } from 'date-fns/locale';
 import { collection, addDoc, serverTimestamp, getDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { toast } from 'sonner';
-import { FileText, Loader2, Download, Pencil, User, Mail } from 'lucide-react';
+import { FileText, Loader2, Download, Pencil, User, Mail, Dices } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { generateAndDownloadPDF, generateAndDownloadDOCX, generatePDFBlob } from '../lib/pdfGenerator';
 import { PasswordPrompt } from '../components/PasswordPrompt';
 import { SendEmailModal } from '../components/SendEmailModal';
+import { EditableInput } from '../components/EditableInput';
 
 const schema = z.object({
   doctorName: z.string().min(1, 'Le nom du médecin est requis').max(100),
@@ -119,6 +120,44 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
       console.error("Erreur lors du chargement des infos:", error);
       toast.error("Erreur lors du chargement des informations");
     }
+  };
+
+  // Load default info automatically on mount if not in edit mode
+  useEffect(() => {
+    if (!isEditMode && user?.uid) {
+      const fetchDefaultInfo = async () => {
+        try {
+          const userSnap = await getDoc(doc(db, 'users', user.uid));
+          if (userSnap.exists() && userSnap.data().defaultInfo) {
+            const info = userSnap.data().defaultInfo;
+            if (info.firstName) setValue('patientFirstName', info.firstName);
+            if (info.lastName) setValue('patientLastName', info.lastName);
+            if (info.dob) setValue('patientDob', info.dob);
+            if (info.eds) setValue('eds', info.eds);
+            if (info.gender) setValue('patientGender', info.gender);
+          }
+        } catch (error) {
+          console.error("Erreur lors du chargement automatique des infos:", error);
+        }
+      };
+      fetchDefaultInfo();
+    }
+  }, [user, isEditMode, setValue]);
+
+  const generateRandomDoctor = () => {
+    const maleFirstNames = ['Jean', 'Pierre', 'Michel', 'Luc', 'Thomas', 'Philippe', 'Antoine', 'Nicolas'];
+    const femaleFirstNames = ['Marie', 'Sophie', 'Anne', 'Julie', 'Isabelle', 'Céline', 'Laura', 'Sarah'];
+    const lastNames = ['Dupont', 'Martin', 'Bernard', 'Dubois', 'Thomas', 'Robert', 'Richard', 'Petit', 'Durand', 'Leroy'];
+    
+    const isFemale = Math.random() > 0.5;
+    const firstNames = isFemale ? femaleFirstNames : maleFirstNames;
+    
+    const randomFirstName = firstNames[Math.floor(Math.random() * firstNames.length)];
+    const randomLastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+    
+    setValue('doctorName', `${randomFirstName} ${randomLastName}`);
+    setValue('doctorTitle', isFemale ? 'Docteure' : 'Docteur');
+    toast.success("Médecin généré aléatoirement");
   };
 
   const generateDocument = async (data: FormData, formatType: 'pdf') => {
@@ -371,14 +410,24 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">Médecin signataire</label>
-                <input
-                  {...register('doctorName')}
-                  className={cn(
-                    "w-full px-4 py-3 rounded-xl border bg-gray-50/50 focus:bg-white transition-all duration-200 outline-none focus:ring-2 focus:ring-gray-900/10",
-                    errors.doctorName ? "border-red-300 focus:border-red-500" : "border-gray-200 focus:border-gray-900"
-                  )}
-                  placeholder="Dr. Dupont"
-                />
+                <div className="relative">
+                  <input
+                    {...register('doctorName')}
+                    className={cn(
+                      "w-full px-4 py-3 rounded-xl border bg-gray-50/50 focus:bg-white transition-all duration-200 outline-none focus:ring-2 focus:ring-gray-900/10",
+                      errors.doctorName ? "border-red-300 focus:border-red-500" : "border-gray-200 focus:border-gray-900"
+                    )}
+                    placeholder="Dr. Dupont"
+                  />
+                  <button
+                    type="button"
+                    onClick={generateRandomDoctor}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                    title="Générer un médecin aléatoire"
+                  >
+                    <Dices className="w-4 h-4" />
+                  </button>
+                </div>
                 {errors.doctorName && <p className="text-xs text-red-500">{errors.doctorName.message}</p>}
               </div>
               
@@ -415,59 +464,35 @@ export function CertificateForm({ user, editData, onClearEdit }: { user: any, ed
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Prénom du patient</label>
-              <input
-                {...register('patientFirstName')}
-                className={cn(
-                  "w-full px-4 py-3 rounded-xl border bg-gray-50/50 focus:bg-white transition-all duration-200 outline-none focus:ring-2 focus:ring-gray-900/10",
-                  errors.patientFirstName ? "border-red-300 focus:border-red-500" : "border-gray-200 focus:border-gray-900"
-                )}
-                placeholder="Jean"
-              />
-              {errors.patientFirstName && <p className="text-xs text-red-500">{errors.patientFirstName.message}</p>}
-            </div>
+            <EditableInput
+              label="Prénom du patient"
+              placeholder="Jean"
+              registerProps={register('patientFirstName')}
+              error={errors.patientFirstName?.message}
+            />
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Nom du patient</label>
-              <input
-                {...register('patientLastName')}
-                className={cn(
-                  "w-full px-4 py-3 rounded-xl border bg-gray-50/50 focus:bg-white transition-all duration-200 outline-none focus:ring-2 focus:ring-gray-900/10",
-                  errors.patientLastName ? "border-red-300 focus:border-red-500" : "border-gray-200 focus:border-gray-900"
-                )}
-                placeholder="Dupont"
-              />
-              {errors.patientLastName && <p className="text-xs text-red-500">{errors.patientLastName.message}</p>}
-            </div>
+            <EditableInput
+              label="Nom du patient"
+              placeholder="Dupont"
+              registerProps={register('patientLastName')}
+              error={errors.patientLastName?.message}
+            />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Date de naissance</label>
-              <input
-                type="date"
-                {...register('patientDob')}
-                className={cn(
-                  "w-full px-4 py-3 rounded-xl border bg-gray-50/50 focus:bg-white transition-all duration-200 outline-none focus:ring-2 focus:ring-gray-900/10",
-                  errors.patientDob ? "border-red-300 focus:border-red-500" : "border-gray-200 focus:border-gray-900"
-                )}
-              />
-              {errors.patientDob && <p className="text-xs text-red-500">{errors.patientDob.message}</p>}
-            </div>
+            <EditableInput
+              label="Date de naissance"
+              type="date"
+              registerProps={register('patientDob')}
+              error={errors.patientDob?.message}
+            />
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">N° EDS</label>
-              <input
-                {...register('eds')}
-                className={cn(
-                  "w-full px-4 py-3 rounded-xl border bg-gray-50/50 focus:bg-white transition-all duration-200 outline-none focus:ring-2 focus:ring-gray-900/10",
-                  errors.eds ? "border-red-300 focus:border-red-500" : "border-gray-200 focus:border-gray-900"
-                )}
-                placeholder="12345678"
-              />
-              {errors.eds && <p className="text-xs text-red-500">{errors.eds.message}</p>}
-            </div>
+            <EditableInput
+              label="N° EDS"
+              placeholder="17123456"
+              registerProps={register('eds')}
+              error={errors.eds?.message}
+            />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">

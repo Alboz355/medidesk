@@ -7,8 +7,10 @@ import { CertificateForm } from './pages/CertificateForm';
 import { History } from './pages/History';
 import { Settings } from './pages/Settings';
 import { Admin } from './pages/Admin';
+import { Clients } from './pages/Clients';
 import { Updates } from './pages/Updates';
 import { Tutorial } from './components/Tutorial';
+import { UserInfoForm } from './components/UserInfoForm';
 import { Toaster } from 'sonner';
 
 export default function App() {
@@ -17,6 +19,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('certificate');
   const [editData, setEditData] = useState<any>(null);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [showUserInfoForm, setShowUserInfoForm] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -24,8 +27,10 @@ export default function App() {
       if (currentUser) {
         try {
           const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-          if (!userDoc.exists() || !userDoc.data().hasSeenTutorial) {
+          if (!userDoc.exists() || !userDoc.data().hasSeenTutorialV2) {
             setShowTutorial(true);
+          } else if (!userDoc.data().hasFilledInfoV2) {
+            setShowUserInfoForm(true);
           }
         } catch (error) {
           console.error("Error checking tutorial status:", error);
@@ -41,13 +46,22 @@ export default function App() {
     if (user) {
       try {
         await setDoc(doc(db, 'users', user.uid), {
-          hasSeenTutorial: true,
+          hasSeenTutorialV2: true,
           role: user.email === 'leartshabija@gmail.com' ? 'admin' : 'client'
         }, { merge: true });
+        
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (!userDoc.exists() || !userDoc.data().hasFilledInfoV2) {
+          setShowUserInfoForm(true);
+        }
       } catch (error) {
         console.error("Error saving tutorial state:", error);
       }
     }
+  };
+
+  const handleUserInfoComplete = () => {
+    setShowUserInfoForm(false);
   };
 
   const handleLogin = async () => {
@@ -118,6 +132,7 @@ export default function App() {
     <div className="flex min-h-screen bg-gray-50 font-sans">
       <Toaster position="top-right" />
       {showTutorial && <Tutorial onComplete={handleTutorialComplete} />}
+      {!showTutorial && showUserInfoForm && <UserInfoForm user={user} onComplete={handleUserInfoComplete} />}
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -132,6 +147,7 @@ export default function App() {
           {activeTab === 'history' && <History user={user} onEdit={(data) => { setEditData(data); setActiveTab('certificate'); }} />}
           {activeTab === 'updates' && <Updates />}
           {activeTab === 'settings' && <Settings user={user} />}
+          {activeTab === 'clients' && isAdmin && <Clients user={user} />}
           {activeTab === 'admin' && isAdmin && <Admin user={user} />}
         </div>
       </main>
