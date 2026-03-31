@@ -12,6 +12,7 @@ import { Updates } from './pages/Updates';
 import { Tutorial } from './components/Tutorial';
 import { UserInfoForm } from './components/UserInfoForm';
 import { Toaster } from 'sonner';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
@@ -131,6 +132,7 @@ export default function App() {
   return (
     <div className="flex min-h-screen bg-gray-50 font-sans">
       <Toaster position="top-right" />
+      <SpeedInsights />
       {showTutorial && <Tutorial onComplete={handleTutorialComplete} />}
       {!showTutorial && showUserInfoForm && <UserInfoForm user={user} onComplete={handleUserInfoComplete} />}
       <Sidebar
